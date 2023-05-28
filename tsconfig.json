@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "lib": ["es2017", "dom"],
+    "baseUrl": ".",
+    "paths": {
+      "~/*": ["lib/*"]
+    },
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "downlevelIteration": true,
+    "jsx": "react-jsx",
+    "outDir": "dist"
+  },
+  "include": ["lib", "docs"]
+}
