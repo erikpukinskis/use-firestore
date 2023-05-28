@@ -8,6 +8,31 @@ const docsArraysByKey: Record<string, Array<object>> = {}
 const unsubscribeByKey: Record<string, () => void> = {}
 const listenersByKey: Record<string, Listener<object>[]> = {}
 
+/**
+ * Returns and caches the results of a Firestore query, such that you can call
+ * the same hook with the same query 50 times on the same page, and
+ * `use-firestore` will only create one single subscription, and will return the
+ * exact same object or array of objects to all 50 of those hooks.
+ *
+ * The `query` object doesn't need to be the same for this to work, as long as
+ * its the same path, filters, and conditions it will produce a cache hit.
+ *
+ * The returned documents will be normal JavaScript objects like:
+ *
+ *       {
+ *         id: "[document id string]",
+ *         field1: value2,
+ *         field2: value2,
+ *         ...etc
+ *       }
+ *
+ * You can provide a type assertion as well:
+ *
+ *       const users = useDocs<Users>(query)
+ *
+ * A subscription to Firestore will be created for each unique query, and the
+ * results of the hook will be updated in realtime.
+ */
 export function useDocs<T extends object>(query: Query<DocumentData>) {
   const key = serializeQuery(query)
 
@@ -52,6 +77,21 @@ export function useDocs<T extends object>(query: Query<DocumentData>) {
   return docs
 }
 
+/**
+ * Returns a unique string for a Firestore query.
+ *
+ * The string will be querystring-like, although not URL encoded. For example, given the following query:
+ *
+ *           query(
+ *             collection(getFirestore(app), "stories"),
+ *             where("ownerUid", "==", "abc123"),
+ *             where("projectId", "==", "xyz")
+ *           )
+ *
+ * `serializeQuery` will return:
+ *
+ *           "path=stories&filters=ownerUid==abc123,projectId==xyz"
+ */
 function serializeQuery(query: Query<DocumentData>) {
   const { _query } = query as Firestore3Query
 
@@ -67,9 +107,7 @@ function serializeQuery(query: Query<DocumentData>) {
         if (isSingleFilter(filter)) {
           return serializeFilter(filter)
         } else {
-          return `${filter.op.toUpperCase()}(${filter.filters
-            .map(serializeFilter)
-            .join(`,`)})`
+          return serializeCompoundFilter(filter)
         }
       })
       .join(" && ")
@@ -97,6 +135,11 @@ function serializeQuery(query: Query<DocumentData>) {
   }
 }
 
+/**
+ * Serialize a single Firebase filter. Returns something like:
+ *
+ *       "ownerUid==abc123"
+ */
 function serializeFilter(filter: SingleFilter) {
   const {
     field: { segments },
@@ -107,6 +150,22 @@ function serializeFilter(filter: SingleFilter) {
   return `${segments.join("/")}${op}${serialize(Object.values(value)[0])}`
 }
 
+/**
+ * Serialize a compound Firebase filter. Returns something like:
+ *
+ *       "AND(filters=ownerUid==abc123,projectId==xyz)"
+ */
+function serializeCompoundFilter(filter: CompoundFilter) {
+  return `${filter.op.toUpperCase()}(${filter.filters
+    .map(serializeFilter)
+    .join(`,`)})`
+}
+
+/**
+ * Data type representing the private `_query` property of a Firestore
+ * `Query<DocumentData>` object. This is likely to change and break things with
+ * new versions of Firestore.
+ */
 type Firestore3Query = Query<DocumentData> & {
   _query: {
     path: {
@@ -121,6 +180,11 @@ type Firestore3Query = Query<DocumentData> & {
   }
 }
 
+/**
+ * Type representing the various filter objects in a Firebase query object
+ */
+type FirestoreFilter = SingleFilter | CompoundFilter
+
 type SingleFilter = {
   field: { segments: string[] }
   op: string
@@ -132,14 +196,14 @@ type CompoundFilter = {
   op: string
 }
 
-type FirestoreFilter = SingleFilter | CompoundFilter
-
 function isSingleFilter(filter: FirestoreFilter): filter is SingleFilter {
   return Object.prototype.hasOwnProperty.call(filter, "field")
 }
 
-type Serializable = string | number | null | undefined | boolean
-
+/**
+ * Returns a unique string representation of any scalar data type that Firestore
+ * supports.
+ */
 function serialize(value: Serializable) {
   if (value === "NULL_VALUE") return "null"
 
@@ -158,3 +222,5 @@ function serialize(value: Serializable) {
 
   throw new Error(`Don't know how to serialize ${JSON.stringify(value)}`)
 }
+
+type Serializable = string | number | null | undefined | boolean
