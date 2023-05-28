@@ -2,7 +2,7 @@ import type { DocumentData, Query } from "firebase/firestore"
 import { onSnapshot } from "firebase/firestore"
 import { useEffect, useState } from "react"
 
-type Listener<T extends object | unknown> = (docs: Array<T>) => void
+type Listener<T extends object> = (docs: Array<T>) => void
 
 const docsArraysByKey: Record<string, Array<object>> = {}
 const unsubscribeByKey: Record<string, () => void> = {}
@@ -49,7 +49,7 @@ export function useDocs<T extends object>(query: Query<DocumentData>) {
         const docs: T[] = []
 
         snapshot.forEach((doc) => {
-          docs.push({ id: doc.id, ...doc.data() } as unknown as T)
+          docs.push({ id: doc.id, ...doc.data() } as T)
         })
 
         docsArraysByKey[key] = docs
@@ -131,6 +131,7 @@ function serializeQuery(query: Query<DocumentData>) {
     console.error(
       `Error serializing query:\n${JSON.stringify(_query, null, 4)}`
     )
+
     throw e
   }
 }
@@ -188,7 +189,7 @@ type FirestoreFilter = SingleFilter | CompoundFilter
 type SingleFilter = {
   field: { segments: string[] }
   op: string
-  value: Record<string, string | number | boolean>
+  value: Record<string, Serializable>
 }
 
 type CompoundFilter = {
@@ -220,7 +221,9 @@ function serialize(value: Serializable) {
     return String(value)
   }
 
-  throw new Error(`Don't know how to serialize ${JSON.stringify(value)}`)
+  throw new Error(
+    `use-firestore doesn't know how to serialize ${JSON.stringify(value)}`
+  )
 }
 
 type Serializable = string | number | null | undefined | boolean
