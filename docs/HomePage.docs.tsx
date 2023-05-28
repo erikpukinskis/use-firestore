@@ -1,4 +1,4 @@
-import { Doc } from "codedocs";
-import React from "react";
+import { Doc } from "codedocs"
+import React from "react"
 
-export default <Doc path="/">Welcome!</Doc>;
+export default <Doc path="/">Welcome!</Doc>

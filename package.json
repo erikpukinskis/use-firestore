@@ -33,6 +33,7 @@
     "firebase": "^9.22.0",
     "jsdom": "^22.1.0",
     "prettier": "2.8.1",
+    "react": "^17.0.0",
     "react-dom": "^17.0.0",
     "react-router-dom": "^6.11.2",
     "tsc-alias": "^1.8.6",
