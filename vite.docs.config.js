@@ -1,8 +1,8 @@
-import path from "path";
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+import path from "path"
+import { defineConfig } from "vite"
+import react from "@vitejs/plugin-react"
 
-const inCodespace = Boolean(process.env.GITHUB_CODESPACE_TOKEN);
+const inCodespace = Boolean(process.env.GITHUB_CODESPACE_TOKEN)
 
 export default defineConfig({
   ...(inCodespace
@@ -33,4 +33,4 @@ export default defineConfig({
       input: path.resolve(__dirname, "docs", "index.html"),
     },
   },
-});
+})
