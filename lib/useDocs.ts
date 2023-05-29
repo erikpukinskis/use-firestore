@@ -68,9 +68,19 @@ export function useDocs<T extends object>(query: Query<DocumentData>) {
 
     listeners.push(listener)
 
-    return () => {
+    return function cleanup() {
       const index = listeners.indexOf(listener)
       listeners.splice(index, 1)
+
+      if (listeners.length === 0) {
+        setTimeout(() => {
+          if (listeners.length > 0) return
+
+          const unsubscribe = unsubscribeByKey[key]
+          delete unsubscribeByKey[key]
+          unsubscribe()
+        }, 100)
+      }
     }
   }, [setDocs])
 

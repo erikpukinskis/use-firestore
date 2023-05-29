@@ -6,6 +6,7 @@ data at the component level.
 - [What it does](#what-it-does)
 - [Example code](#example-code)
 - [Why](#why)
+- [Todo](#todo)
 
 ### What it does
 
@@ -157,3 +158,8 @@ In this scenario, we get a few nice performance benefits:
 3. The `keyBy` function will only be called once
 
 Additionally, if we were to use that `tags` array as a prop to a memoized component, it would only trigger a re-render when the collection actually changes, regardless of how many times the parent component renders.
+
+### Todo
+
+- [ ] Unsubscribe from query when no more listeners are left
+- [ ] Add tests
