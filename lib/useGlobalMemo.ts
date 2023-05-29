@@ -82,7 +82,7 @@ export function useGlobalMemo<GeneratedValue>(
     return fresh
   }
 
-  return cached
+  return cached as GeneratedValue
 }
 
 /**
