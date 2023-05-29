@@ -59,13 +59,13 @@ const Undefined = Symbol("undefined")
  * In this example, `a + b` will only be calculated once, even if you call this
  * hook a hundred times with the same values in a hundred different components.
  */
-export function useGlobalMemo<V>(
+export function useGlobalMemo<GeneratedValue>(
   cacheKey: string,
-  generator: () => V,
+  generator: () => GeneratedValue,
   dependencies: Array<Serializable>
 ) {
   if (/\|/.test(cacheKey)) {
-    throw new Error("keys cannot use the | character")
+    throw new Error("useGlobalMemo cacheKey cannot use the | character")
   }
 
   const serialized = dependencies.map(serialize)
@@ -74,10 +74,9 @@ export function useGlobalMemo<V>(
 
   const cached = cache[address]
 
-  if (cached === Undefined) return undefined
+  if (cached === Undefined) return undefined as GeneratedValue
 
   if (cached === undefined) {
-    console.log(address, "cache miss")
     const fresh = generator()
     cache[address] = fresh === undefined ? Undefined : fresh
     return fresh
