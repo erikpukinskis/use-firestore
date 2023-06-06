@@ -1,12 +1,6 @@
 {
   "workbench.startupEditor": "none",
   "workbench.colorTheme": "After Dark No Italics",
-  "workbench.colorCustomizations": {
-    "[GitHub Dark]": {
-      "tab.inactiveBackground": "#121416",
-      "tab.activeBorderTop": "#24292E"
-    }
-  },
   "editor.tabSize": 2,
   "editor.insertSpaces": true,
   "editor.detectIndentation": false,
