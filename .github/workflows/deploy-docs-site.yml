@@ -13,8 +13,7 @@ jobs:
       - run: corepack prepare yarn@stable --activate
       - name: Configure pages
         uses: actions/configure-pages@v2
-      - name: Build site
-        run: yarn build:docs
+      - run: yarn build:docs
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
