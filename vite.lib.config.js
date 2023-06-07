@@ -1,6 +1,5 @@
 import path from "path"
 import { defineConfig } from "vite"
-import react from "@vitejs/plugin-react"
 
 export default defineConfig({
   test: {
@@ -12,8 +11,6 @@ export default defineConfig({
       "~": path.resolve(__dirname, "./lib"),
     },
   },
-
-  plugins: [react()],
 
   build: {
     emptyOutDir: false,
