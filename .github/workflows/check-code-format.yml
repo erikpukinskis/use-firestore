@@ -1,4 +1,4 @@
-name: code format
+name: check code format
 jobs:
   check:
     runs-on: ubuntu-latest

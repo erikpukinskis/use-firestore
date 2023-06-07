@@ -1,4 +1,4 @@
-name: docs site
+name: build docs site
 jobs:
   build:
     runs-on: ubuntu-latest

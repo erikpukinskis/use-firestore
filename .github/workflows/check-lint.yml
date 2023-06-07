@@ -1,4 +1,4 @@
-name: lint
+name: check lint
 jobs:
   check:
     runs-on: ubuntu-latest

@@ -1,4 +1,4 @@
-name: docs site
+name: deploy docs site
 permissions:
   contents: read
   pages: write
