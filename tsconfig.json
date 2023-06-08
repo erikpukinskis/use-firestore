@@ -11,7 +11,8 @@
     "skipLibCheck": true,
     "downlevelIteration": true,
     "jsx": "react-jsx",
-    "outDir": "dist"
+    "outDir": "dist",
+    "sourceMap": true
   },
   "include": ["lib", "docs"]
 }
