@@ -1,6 +1,6 @@
 {
   "name": "use-firestore",
-  "version": "0.6.0",
+  "version": "0.7.0-beta.0",
   "license": "MIT",
   "main": "./dist/lib.umd.js",
   "module": "./dist/lib.es.js",
@@ -57,5 +57,6 @@
     "start:docs:dev": "vite serve docs --config vite.docs.config.js",
     "test": "vitest run --config vite.test.config.js",
     "watch:test": "vitest watch --config vite.test.config.js"
-  }
+  },
+  "packageManager": "yarn@1.22.19"
 }
