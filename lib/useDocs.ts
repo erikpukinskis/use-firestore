@@ -77,7 +77,11 @@ export function useDocs<T extends object>(query: Query<DocumentData>) {
           if (listeners.length > 0) return
 
           const unsubscribe = unsubscribeByKey[key]
+
+          if (!unsubscribe) return
+
           delete unsubscribeByKey[key]
+
           unsubscribe()
         }, 100)
       }
