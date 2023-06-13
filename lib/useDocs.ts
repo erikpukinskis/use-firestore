@@ -1,6 +1,7 @@
 import type { DocumentData, Query } from "firebase/firestore"
 import { onSnapshot } from "firebase/firestore"
 import { useEffect, useState } from "react"
+import type { Association } from "./associations"
 
 type Listener<T extends object> = (docs: Array<T>) => void
 
@@ -33,7 +34,10 @@ const listenersByKey: Record<string, Listener<object>[]> = {}
  * A subscription to Firestore will be created for each unique query, and the
  * results of the hook will be updated in realtime.
  */
-export function useDocs<T extends object>(query: Query<DocumentData>) {
+export function useDocs<T extends object>(
+  query: Query<DocumentData>,
+  ...associations: Association[]
+) {
   const key = serializeQuery(query)
 
   const [docs, setDocs] = useState(docsArraysByKey[key] as Array<T> | undefined)

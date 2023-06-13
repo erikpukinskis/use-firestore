@@ -91,6 +91,110 @@ const users = useGlobalMemo("users", () => userDocs.map((user)) => ({
 }), [userDocs, assignmentsById])
 ```
 
+### Associations
+
+`use-firestore` also provides a set of tools for working with documents with associations.
+
+The Firestore philosophy generally says to de-normalize data when you need to load data from two collections that are associated with one another. So for example, if you want to show a list of `repos` each with a set of `tags`, de-normalization might suggest a Firestore document structure like:
+
+```javascript
+// /repos/:id
+{
+  url: "https://github.com/erikpukinskis/use-firestore",
+  starCount: 0,
+  tags: [
+    {
+      id: "abc123",
+      text: "MIT Licensed"
+      color: "blue",
+    },
+    {
+      id: "def456",
+      text: "Firestore",
+      color: "aqua",
+    }
+  ],
+}
+```
+
+However, this creates a lot of headache when it comes to editing tags:
+
+1. Every time you want to write to the `tags` collection, by changing the `test` or the `color`, you need to also hunt down all the documents in the `repos` collection which use it, and update the array at `/repos/:id/tags` as well.
+
+2. If you ever want to delete a tag, you need to go splice that tag out of all of the repos too.
+
+Instead of doing things this way, `use-firestore` provides some ways to use a _normalized_ document structure.
+
+The manual way to do this is simply to use dictionaries like the `assignmentsByUserId` dictionary demonstrated above. This works great as long as your collection query is small enough that it can be efficiently downloaded in its entirity on the client.
+
+However, when the data accessible to a given user gets sufficiently large, you may not want to download an entire data set. In this case you can use the `associations` option on the various hooks and functions in `use-firestore`.
+
+**Example:** Including associations with a collection query
+
+```tsx
+import { useDocs, manyToMany } from "use-firestore"
+import { getFirestore, query, collection, where } from "firebase/firestore"
+
+const repos = useDocs(
+  query(
+    collection(getFirestore(app), "repos"),
+    where("ownerId", "==", ownerId)
+  ),
+  manyToMany({
+    field: "tagIds",
+    collection: collection(getFirestore(app), "tags"),
+  })
+)
+```
+
+The hook above will first run the `repos` query directly. It will then look at each of the documents returned for a `tagIds` field which should be an array of string document ids.
+
+Then `useDocs` will do a second query, on the tags collection, adding a where clause like `where("id", "in", flattenedTagIds)`.
+
+And finally, it will map each of the original `tagIds` arrays to an array `tags` and add those to the respective "repo" doc.
+
+**Example:** Deleting associated data
+
+```tsx
+import { deleteDocs, manyToMany } from "use-firestore"
+import { collection, getFirestore } from "firebase/firestore"
+
+await deleteDocs(
+  db,
+  "tags",
+  ["tag123"],
+  manyToMany({
+    collection: collection(getFirestore(app), "repos")
+    field: "tagIds",
+  })
+)
+```
+
+That code will first query the `repos` collection, and download any repos that have `tagIds` in the list of tag ids to delete. So in this example it will query repos `where("tagIds", "array-contains-any", ["tag123"])`.
+
+Then it will update all of those `tagIds` arrays to exclude `"tag123"`.
+
+And finally, it will delete the `/tags/tag123` document.
+
+**Example:** Bulk dissociation
+
+```tsx
+import { dissociateDocs, manyToMany } from "use-firestore"
+import { query, getFirestore } from "firebase/firestore"
+
+await dissociateDocs(
+  db,
+  "tags",
+  ["tag123"],
+  manyToMany({
+    collection: collection(getFirestore(app), "repos")
+    field: "tagIds",
+  })
+)
+```
+
+`dissociateDocs` works just the same as `deleteDocs`, it just doesn't delete them. It only breaks the associations.
+
 ### Why
 
 Applications can be built a lot more simply when individual components can request the data they need, without having to worry about triggering the N+1 problem.
