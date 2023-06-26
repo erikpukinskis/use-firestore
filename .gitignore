@@ -5,3 +5,5 @@ dist
 .DS_Store
 node_modules
 firestore-debug.log
+ui-debug.log
+firebase-debug.log
