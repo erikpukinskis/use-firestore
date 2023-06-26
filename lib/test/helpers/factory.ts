@@ -8,7 +8,7 @@ export type Tag = {
 
 let tagIndex = 0
 
-export async function createTag(
+export async function setUpTag(
   app: FirebaseApp,
   overrides: Partial<Tag> = {}
 ): Promise<Tag> {
@@ -37,7 +37,7 @@ export type Repo = {
   ownerId: string
 }
 
-export async function createRepo(
+export async function setUpRepo(
   app: FirebaseApp,
   overrides: Partial<Repo> = {}
 ): Promise<Repo> {
