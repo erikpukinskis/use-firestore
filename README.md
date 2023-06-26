@@ -38,7 +38,7 @@ const users = useDocs<Users>(query)
 A subscription to Firestore will be created for each unique query, and the
 results of the hook will be updated in realtime.
 
-### Example code
+### `useDocs` hook
 
 ```tsx
 import { useDocs, useGlobalMemo } from "use-firestore"
@@ -89,6 +89,17 @@ const users = useGlobalMemo("users", () => userDocs.map((user)) => ({
   ...user,
   assignments: assignmentsByUserId[user.id] ?? []
 }), [userDocs, assignmentsById])
+```
+
+### `useDoc` hook
+
+```tsx
+import { useDoc } from "use-firestore"
+import { query, getFirestore } from "firebase/firestore"
+import { groupBy } from "lodash"
+
+const [repo, updateRepo = useDoc<Repo>(doc(getFirestore(testApp), "repos", repoId))
+
 ```
 
 ### Why
