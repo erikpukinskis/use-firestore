@@ -8,23 +8,22 @@ export type Tag = {
 
 let tagIndex = 0
 
-export async function setUpTag(
-  app: FirebaseApp,
-  overrides: Partial<Tag> = {}
-): Promise<Tag> {
+export async function setUpTag(app: FirebaseApp, overrides: Partial<Tag> = {}) {
   tagIndex++
 
-  const tag = {
+  const properties = {
     text: `Tag No.${tagIndex}`,
     ...overrides,
   }
 
-  const ref = await addDoc(collection(getFirestore(app), "tags"), tag)
+  const ref = await addDoc(collection(getFirestore(app), "tags"), properties)
 
-  return {
+  const tag = {
     id: ref.id,
-    ...tag,
-  }
+    ...properties,
+  } as Tag
+
+  return { tag }
 }
 
 let repoIndex = 0
@@ -40,12 +39,12 @@ export type Repo = {
 export async function setUpRepo(
   app: FirebaseApp,
   overrides: Partial<Repo> = {}
-): Promise<Repo> {
+) {
   repoIndex++
 
   const ownerId = overrides.ownerId ?? `owner-for-${repoIndex}`
 
-  const repo = {
+  const properties = {
     ownerId,
     url: `https://github.com/${ownerId}/repo-${repoIndex}`,
     starCount: Math.floor(Math.random() * 3),
@@ -53,10 +52,12 @@ export async function setUpRepo(
     ...overrides,
   }
 
-  const ref = await addDoc(collection(getFirestore(app), "repos"), repo)
+  const ref = await addDoc(collection(getFirestore(app), "repos"), properties)
 
-  return {
+  const repo = {
     id: ref.id,
-    ...repo,
-  }
+    ...properties,
+  } as Repo
+
+  return { repo }
 }

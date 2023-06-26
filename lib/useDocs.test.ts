@@ -11,14 +11,14 @@ import type { Repo } from "~/test/helpers/factory"
 describe("useDocs", () => {
   connectToEmulators(beforeAll, afterAll)
 
-  it("fetches docs", async () => {
+  it("returns a doc", async () => {
     await factory.setUpRepo(testApp, {
       ownerId: "talia",
     })
 
     const { result } = renderHook(
       () =>
-        useDocs(
+        useDocs<Repo>(
           query(
             collection(getFirestore(testApp), "repos"),
             where("ownerId", "==", "talia")
