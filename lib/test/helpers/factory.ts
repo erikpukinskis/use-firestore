@@ -38,7 +38,7 @@ export type Repo = {
 
 export async function setUpRepo(
   app: FirebaseApp,
-  overrides: Partial<Repo> = {}
+  overrides: Omit<Partial<Repo>, "id"> = {}
 ) {
   repoIndex++
 

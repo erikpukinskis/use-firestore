@@ -4,6 +4,8 @@ import { serializeQuery } from "./serializeQuery"
 
 export type DocumentWithId = DocumentData & { id: string }
 
+export const UNSUBSCRIBE_DELAY = 100
+
 /**
  * The SubscriptionService keeps track of:
  *
@@ -214,6 +216,12 @@ export class SubscriptionService {
       }
 
       assignQueryOwnerFunctions.splice(index, 1)
+
+      console.log(
+        "now there are",
+        assignQueryOwnerFunctions.length,
+        "available owners"
+      )
     }
 
     /**
@@ -229,7 +237,7 @@ export class SubscriptionService {
         // We wait a little bit before unsubscribing, just in case we're
         // navigating or something and we're about to get a new wave of hooks
         // that might want to take over ownership.
-        setTimeout(unsubscribe, 1000)
+        setTimeout(unsubscribe, UNSUBSCRIBE_DELAY)
       } else {
         ignoreOwnershipRequests()
       }
@@ -246,7 +254,7 @@ export class SubscriptionService {
     return unregister
   }
 
-  registerDocumentHook(
+  registerDocHook(
     hookId: string,
     ref: DocumentReference<DocumentData>,
     onDoc: (doc: DocumentWithId) => void
@@ -290,6 +298,7 @@ export class SubscriptionService {
      * listeners to this path.
      */
     const subscribe = () => {
+      console.log("subscribing", hookId)
       if (this.ownerByDocPath[path]) {
         throw new Error(
           `Path ${path} is already owned by ${this.ownerByDocPath[path]}`
@@ -297,6 +306,12 @@ export class SubscriptionService {
       }
 
       const unsubscribeFromSnapshot = onSnapshot(ref, (snapshot) => {
+        if (!snapshot.exists()) {
+          throw new Error(
+            `Received a snapshot suggesting document ${ref.path} does not exist`
+          )
+        }
+
         const newDoc = {
           id: ref.id,
           ...snapshot.data(),
@@ -319,16 +334,23 @@ export class SubscriptionService {
      * there is one available or otherwise unsubscribe from snapshots.
      */
     const unsubscribe = () => {
+      console.log(
+        "unsubscribing",
+        hookId,
+        "owner is",
+        this.ownerByDocPath[path]
+      )
       // If we're not the owner of the current subscription, there's nothing to unsubscribe
       if (this.ownerByDocPath[path] !== hookId) {
         return
       }
 
-      const assignNextOwner = this.assignDocOwnerFunctionsByPath[path]?.shift()
+      const assignNextOwner = assignDocOwnerFunctions?.shift()
 
       // Give up ownership
       delete this.ownerByDocPath[path]
 
+      console.log("is there another owner?", assignNextOwner ? "yes" : "no")
       // If there's someone else waiting to be the new owner, let 'em have the subscription
       if (assignNextOwner) {
         assignNextOwner()
@@ -345,6 +367,7 @@ export class SubscriptionService {
       }
 
       unsubscribeFromSnapshots()
+      console.log("unsubscribed from firestore")
     }
 
     /**
@@ -352,9 +375,12 @@ export class SubscriptionService {
      * be ready to take over if needed.
      */
     const listen = () => {
+      console.log("listening", hookId)
       // There's already a document subscription, owned by someone else. Just
       // register ourselves as a potential next owner:
       assignDocOwnerFunctions.push(takeOwnership)
+
+      console.log(assignDocOwnerFunctions.length, "owners waiting")
 
       const lastDoc = this.lastDocByPath[path]
 
@@ -363,7 +389,13 @@ export class SubscriptionService {
 
     const takeOwnership = () => {
       this.ownerByDocPath[path] = hookId
-      ignoreOwnershipRequests()
+      console.log(
+        hookId,
+        "now owns",
+        path,
+        "possible owners were",
+        assignDocOwnerFunctions
+      )
     }
 
     /**
@@ -371,15 +403,19 @@ export class SubscriptionService {
      * unregister ourselves when the hook is done
      */
     const ignoreOwnershipRequests = () => {
-      const index = assignDocOwnerFunctions.findIndex((func) => func === onDoc)
+      const index = assignDocOwnerFunctions.findIndex(
+        (func) => func === takeOwnership
+      )
 
       if (index < 0) {
         throw new Error(
-          `Take-ownership-function for hook ${hookId} was already gone before unlisten() was called`
+          `zup Doc ownership function for hook ${hookId} was already gone before unlisten() was called ${assignDocOwnerFunctions.length}`
         )
       }
 
       assignDocOwnerFunctions.splice(index, 1)
+
+      console.log(assignDocOwnerFunctions.length, "owners waiting")
     }
 
     /**
@@ -387,6 +423,7 @@ export class SubscriptionService {
      * current subscription owner.
      */
     const unregister = () => {
+      console.log("unregistering", hookId)
       // First remove ourselves as a listener so we immediately stop sending snapshots to the callback
       removeListener()
 
@@ -394,8 +431,11 @@ export class SubscriptionService {
         // We wait a little bit before unsubscribing, just in case we're
         // navigating or something and we're about to get a new wave of hooks
         // that might want to take over ownership.
-        setTimeout(unsubscribe, 1000)
+        setTimeout(unsubscribe, UNSUBSCRIBE_DELAY)
       } else {
+        console.log(
+          `we (${hookId}) are not the owner, ${this.ownerByDocPath[path]} is`
+        )
         ignoreOwnershipRequests()
       }
     }

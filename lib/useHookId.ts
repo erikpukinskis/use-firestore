@@ -16,10 +16,10 @@ function isReference(
 export function useHookId(context: Query | DocumentReference) {
   const [id] = useState(() => {
     if (isReference(context)) {
-      return `path=${context.path.replace("/", "-")}/${++hookCount}`
+      return `[doc ${context.path} #${++hookCount}]`
     } else {
       const pathPlus = serializeQuery(context).split("=")[0]
-      return `query=${pathPlus}/${++hookCount}`
+      return `[query ${pathPlus} #${++hookCount}]`
     }
   })
 
