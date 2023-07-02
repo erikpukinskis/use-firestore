@@ -82,16 +82,18 @@ export class SubscriptionService {
     const subscribe = () => {
       let previousPaths: Set<string> | undefined
 
-      const unsubscribeFromQuery = onSnapshot(query, (snapshot) => {
+      const unsubscribeFromQuery = onSnapshot(query, (querySnapshot) => {
         const newPaths = new Set<string>()
 
         const docs: DocumentWithId[] = []
 
-        snapshot.forEach((doc) => {
-          const path = doc.ref.path
+        querySnapshot.forEach((docSnapshot) => {
+          const path = docSnapshot.ref.path
+          const doc = { id: docSnapshot.id, ...docSnapshot.data() }
 
           newPaths.add(path)
-          docs.push({ id: doc.id, ...doc.data() })
+          docs.push(doc)
+          this.lastDocByPath[path] = doc
 
           if (!this.ownerByDocPath[path]) {
             this.ownerByDocPath[path] = hookId
@@ -132,6 +134,7 @@ export class SubscriptionService {
       })
 
       this.unsubscribeFunctionsByQueryKey[queryKey] = unsubscribeFromQuery
+      this.ownerByQueryKey[queryKey] = hookId
     }
 
     /**
@@ -139,6 +142,7 @@ export class SubscriptionService {
      * there is one available or otherwise unsubscribe from snapshots.
      */
     const unsubscribe = () => {
+      console.log(hookId, "is unsubscribing from", queryKey)
       // Some other hook is the owner of this query key, there's nothing for us
       // to unsubscribe
       if (this.ownerByQueryKey[queryKey] !== hookId) {
@@ -210,6 +214,7 @@ export class SubscriptionService {
       )
 
       if (index < 0) {
+        debugger
         throw new Error(
           `Take-ownership-function for hook ${hookId} was already gone before unlisten() was called`
         )
@@ -239,19 +244,28 @@ export class SubscriptionService {
         // that might want to take over ownership.
         setTimeout(unsubscribe, UNSUBSCRIBE_DELAY)
       } else {
+        console.log(
+          hookId,
+          "is unregistering and it is not the owner,",
+          this.ownerByQueryKey[queryKey],
+          "is"
+        )
         ignoreOwnershipRequests()
       }
     }
 
+    let cachedResults: DocumentWithId[] | undefined
+
     // If there's already an owner for this query, we just listen to their
     // results. Otherwise we create a new subscription.
     if (this.ownerByQueryKey[queryKey]) {
+      cachedResults = this.lastQueryResultByKey[queryKey]
       listen()
     } else {
       subscribe()
     }
 
-    return unregister
+    return { unregister, cachedResults }
   }
 
   registerDocHook(
@@ -388,6 +402,7 @@ export class SubscriptionService {
     }
 
     const takeOwnership = () => {
+      console.log(hookId, "is taking ownership of", path)
       this.ownerByDocPath[path] = hookId
       console.log(
         hookId,
@@ -440,12 +455,15 @@ export class SubscriptionService {
       }
     }
 
+    let cachedDoc: DocumentWithId | undefined
+
     if (this.ownerByDocPath[path]) {
+      cachedDoc = this.lastDocByPath[path]
       listen()
     } else {
       subscribe()
     }
 
-    return unregister
+    return { unregister, cachedDoc }
   }
 }

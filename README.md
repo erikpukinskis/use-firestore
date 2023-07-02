@@ -172,5 +172,7 @@ Additionally, if we were to use that `tags` array as a prop to a memoized compon
 
 ### Todo
 
-- [ ] Unsubscribe from query when no more listeners are left
-- [ ] Add tests
+- [x] Unsubscribe from query when no more listeners are left
+- [x] Add tests
+- [ ] useAssociationLookup()
+- [ ] useCascadingDelete()

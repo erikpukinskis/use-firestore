@@ -38,9 +38,15 @@ export function useDoc<T extends DocumentWithId>(ref: DocumentReference) {
   const path = ref.path
 
   useEffect(() => {
-    const unregister = service.registerDocHook(hookId, ref, (doc) => {
-      setDoc(doc as T)
-    })
+    const { unregister, cachedDoc: doc } = service.registerDocHook(
+      hookId,
+      ref,
+      (doc) => {
+        setDoc(doc as T)
+      }
+    )
+
+    if (doc) setDoc(doc as T)
 
     return unregister
   }, [path])

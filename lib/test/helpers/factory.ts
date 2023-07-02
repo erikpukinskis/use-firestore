@@ -26,26 +26,32 @@ export async function setUpTag(app: FirebaseApp, overrides: Partial<Tag> = {}) {
   return { tag }
 }
 
-let repoIndex = 0
+const repoIndex = 0
 
 export type Repo = {
   id: string
+  slug: string
   url: string
   starCount: number
   tagIds: string[]
   ownerId: string
 }
 
+let repoCount = 0
+
 export async function setUpRepo(
   app: FirebaseApp,
   overrides: Omit<Partial<Repo>, "id"> = {}
 ) {
-  repoIndex++
+  const uniqueId = ++repoCount
 
-  const ownerId = overrides.ownerId ?? `owner-for-${repoIndex}`
+  const slug = overrides.slug ?? `repo-${uniqueId}`
+
+  const ownerId = overrides.ownerId ?? `owner-for-${slug}`
 
   const properties = {
     ownerId,
+    slug,
     url: `https://github.com/${ownerId}/repo-${repoIndex}`,
     starCount: Math.floor(Math.random() * 3),
     tagIds: [],

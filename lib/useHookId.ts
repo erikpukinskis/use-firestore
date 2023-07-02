@@ -18,8 +18,7 @@ export function useHookId(context: Query | DocumentReference) {
     if (isReference(context)) {
       return `[doc ${context.path} #${++hookCount}]`
     } else {
-      const pathPlus = serializeQuery(context).split("=")[0]
-      return `[query ${pathPlus} #${++hookCount}]`
+      return `[query ${serializeQuery(context).slice(0, 100)} #${++hookCount}]`
     }
   })
 

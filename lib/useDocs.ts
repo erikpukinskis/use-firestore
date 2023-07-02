@@ -36,9 +36,15 @@ export function useDocs<T extends DocumentWithId>(query: Query<DocumentData>) {
   const service = useSubscriptionService("useDocs")
 
   useEffect(() => {
-    const unregister = service.registerQueryHook(hookId, query, (docs) => {
-      setDocs(docs as Array<T>)
-    })
+    const { unregister, cachedResults } = service.registerQueryHook(
+      hookId,
+      query,
+      (docs) => {
+        setDocs(docs as Array<T>)
+      }
+    )
+
+    if (cachedResults) setDocs(cachedResults)
 
     return unregister
   }, [serializeQuery(query)])

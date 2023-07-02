@@ -1,19 +1,29 @@
-import { render, waitFor } from "@testing-library/react"
+import {
+  fireEvent,
+  render,
+  waitFor,
+  waitForElementToBeRemoved,
+} from "@testing-library/react"
 import { renderHook } from "@testing-library/react-hooks"
 import {
+  collection,
   doc,
   getDoc,
   getFirestore,
+  query,
+  where,
   type DocumentReference,
   type DocumentSnapshot,
   type Unsubscribe,
 } from "firebase/firestore"
 import * as Firestore from "firebase/firestore"
+import React, { useState } from "react"
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest"
 import { DocsProvider } from "./DocsProvider"
 import { UNSUBSCRIBE_DELAY } from "./SubscriptionService"
 import { connectToEmulators, testApp } from "./test/helpers/connectToEmulators"
 import { useDoc } from "./useDoc"
+import { useDocs } from "./useDocs"
 import * as factory from "~/test/helpers/factory"
 import type { Repo } from "~/test/helpers/factory"
 
@@ -68,13 +78,115 @@ describe("useDoc", () => {
     })
   })
 
-  // it("unsubscribes on unmount")
+  function RepoDetails({ id }: { id: string }) {
+    const [repo] = useDoc<Repo>(doc(getFirestore(testApp), "repos", id))
 
-  // it(
-  //   "doesn't resubscribe if pulling doc that's already be pulled in a collection"
-  // )
+    if (!repo) return <>{id} not loaded</>
 
-  // it("triggers subscribe when query unmounts")
+    return <div>{repo.starCount} stars</div>
+  }
+
+  function ReposPage({ ownerId }: { ownerId: string }) {
+    const [expandedId, setExpandedId] = useState<string | undefined>()
+    const [focusMode, setFocusMode] = useState(false)
+
+    return (
+      <>
+        {focusMode ? null : (
+          <ListRepos ownerId={ownerId} onClickRepo={setExpandedId} />
+        )}
+        {expandedId && <RepoDetails id={expandedId} />}
+        <button onClick={() => setFocusMode(true)}>Focus mode</button>
+      </>
+    )
+  }
+
+  function ListRepos({
+    ownerId,
+    onClickRepo,
+  }: {
+    ownerId: string
+    onClickRepo(id: string): void
+  }) {
+    const repos = useDocs(
+      query(
+        collection(getFirestore(testApp), "repos"),
+        where("ownerId", "==", ownerId)
+      )
+    )
+
+    if (!repos) return null
+
+    return (
+      <>
+        {repos.map(({ slug, id }) => (
+          <React.Fragment key={id}>
+            <h1>{slug}</h1>
+            <button key={id} onClick={() => onClickRepo(id)}>
+              Expand {slug}
+            </button>
+          </React.Fragment>
+        ))}
+      </>
+    )
+  }
+
+  it.only("doesn't create another subscription if pulling doc that's already be pulled in a query", async () => {
+    const {
+      repo: { ownerId },
+    } = await factory.setUpRepo(testApp, { slug: "one", starCount: 850 })
+    await factory.setUpRepo(testApp, { ownerId: ownerId, slug: "two" })
+
+    const { onSnapshot, unsubscribes } = mockSubscriptions()
+
+    const { getByRole, getByText, queryByRole } = render(
+      <ReposPage ownerId={ownerId} />,
+      {
+        wrapper: DocsProvider,
+      }
+    )
+
+    await waitFor(() => {
+      expect(onSnapshot).toHaveBeenCalledTimes(1)
+      getByRole("button", { name: "Expand one" })
+    })
+
+    fireEvent.click(getByRole("button", { name: "Expand one" }))
+
+    await waitFor(() => getByText("850 stars"))
+
+    fireEvent.click(getByRole("button", { name: "Focus mode" }))
+
+    expect(queryByRole("button", { name: "Expand one" })).toBeNull()
+
+    expect(onSnapshot).toHaveBeenCalledTimes(1)
+    expect(unsubscribes).toHaveLength(0)
+
+    await sleep(UNSUBSCRIBE_DELAY)
+
+    expect(unsubscribes).toHaveLength(1)
+    expect(onSnapshot).toHaveBeenCalledTimes(2)
+  })
+
+  // it("adds doc subscription when query unmounts")
+
+  function RepoRouter({
+    id,
+    route,
+  }: {
+    id: string
+    route: "details" | "owner"
+  }) {
+    return route === "details" ? <RepoDetails id={id} /> : <RepoOwner id={id} />
+  }
+
+  function RepoOwner({ id }: { id: string }) {
+    const [repo] = useDoc<Repo>(doc(getFirestore(testApp), "repos", id))
+
+    if (!repo) return null
+
+    return <div>Owned by {repo.ownerId}</div>
+  }
 
   it("hands off subscription to another listener during a navigation change", async () => {
     const { repo } = await factory.setUpRepo(testApp, {
@@ -84,38 +196,7 @@ describe("useDoc", () => {
 
     const { onSnapshot, unsubscribes } = mockSubscriptions()
 
-    function RepoRouter({
-      id,
-      route,
-    }: {
-      id: string
-      route: "details" | "owner"
-    }) {
-      return route === "details" ? (
-        <RepoDetails id={id} />
-      ) : (
-        <RepoOwner id={id} />
-      )
-    }
-
-    function RepoDetails({ id }: { id: string }) {
-      const [repo] = useDoc<Repo>(doc(getFirestore(testApp), "repos", id))
-
-      if (!repo) return null
-
-      return <div>{repo.starCount} stars</div>
-    }
-
-    function RepoOwner({ id }: { id: string }) {
-      const [repo] = useDoc<Repo>(doc(getFirestore(testApp), "repos", id))
-
-      if (!repo) return null
-
-      return <div>Owned by {repo.ownerId}</div>
-    }
-
-    // First render, should render <RepoDetails />
-    const { rerender, getByText, unmount, debug } = render(
+    const { rerender, getByText, unmount } = render(
       <RepoRouter id={repo.id} route="details" />,
       {
         wrapper: DocsProvider,
@@ -149,6 +230,12 @@ describe("useDoc", () => {
   })
 })
 
+/**
+ * Async helper to wait a few milliseconds for the subscriptions to be
+ * processed. Ideally we would use vi.useFakeTimers but when I tried that, the
+ * tests hung when trying to use the factories. Maybe Firestore doesn't play
+ * nicely with vi.useFakeTimers()?
+ */
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
