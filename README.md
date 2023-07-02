@@ -1,4 +1,8 @@
-**use-firestore** provides a set of React hooks which let you load Firestore
+<p align="center">
+<img src="./icon.png" width="128" height="128" alt="the use-firestore logo, a painting of a red can with a flame on the label" />
+</p>
+
+<b>use-firestore</b> provides a set of React hooks which let you load Firestore
 data at the component level.
 
 **Table of Contents**
