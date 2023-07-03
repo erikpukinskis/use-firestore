@@ -13,10 +13,11 @@ const DocsContext = createContext<SubscriptionService>(
 
 type DocsProviderProps = {
   children: React.ReactNode
+  debug?: boolean
 }
 
-export function DocsProvider({ children }: DocsProviderProps) {
-  const [service] = useState(() => new SubscriptionService())
+export function DocsProvider({ children, debug = false }: DocsProviderProps) {
+  const [service] = useState(() => new SubscriptionService(debug))
 
   return <DocsContext.Provider value={service}>{children}</DocsContext.Provider>
 }

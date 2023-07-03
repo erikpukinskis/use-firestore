@@ -6,6 +6,10 @@ type CachedDocument = DocumentData & { id: string; __path: string }
 
 export const UNSUBSCRIBE_DELAY = 100
 
+function red(text: string) {
+  return `\x1b[31m${text}\x1b[0m`
+}
+
 /**
  * The SubscriptionService keeps track of:
  *
@@ -21,6 +25,8 @@ export const UNSUBSCRIBE_DELAY = 100
  * subscriptions as needed, to keep all of the hooks fed with up-to-date data.
  */
 export class SubscriptionService {
+  debug: boolean
+
   // For documents...
   ownerByDocPath: Record<string, string> = {}
   unsubscribeFunctionsByDocPath: Record<string, () => void> = {}
@@ -35,6 +41,15 @@ export class SubscriptionService {
     {}
   lastQueryResultByKey: Record<string, Array<CachedDocument>> = {}
   assignQueryOwnerFunctionsByKey: Record<string, Array<() => void>> = {}
+
+  constructor(debug: boolean) {
+    this.debug = debug
+  }
+
+  log(...args: Parameters<typeof console.log>) {
+    if (!this.debug) return
+    console.log(`${red("use-firestore")} |`, ...args)
+  }
 
   registerQueryHook(
     hookId: string,
@@ -146,7 +161,7 @@ export class SubscriptionService {
      * there is one available or otherwise unsubscribe from snapshots.
      */
     const unsubscribe = () => {
-      console.log(hookId, "is unsubscribing from", queryKey)
+      this.log(hookId, "is unsubscribing from", queryKey)
       // Some other hook is the owner of this query key, there's nothing for us
       // to unsubscribe
       if (this.ownerByQueryKey[queryKey] !== hookId) {
@@ -195,7 +210,7 @@ export class SubscriptionService {
           this.assignDocOwnerFunctionsByPath[doc.__path]?.shift()
 
         if (!assignNextDocOwner) {
-          console.log("no possible owners for", doc.__path)
+          this.log("no possible owners for", doc.__path)
           continue
         }
 
@@ -246,7 +261,7 @@ export class SubscriptionService {
 
       assignQueryOwnerFunctions.splice(index, 1)
 
-      console.log(
+      this.log(
         "now there are",
         assignQueryOwnerFunctions.length,
         "available owners"
@@ -268,7 +283,7 @@ export class SubscriptionService {
         // that might want to take over ownership.
         setTimeout(unsubscribe, UNSUBSCRIBE_DELAY)
       } else {
-        console.log(
+        this.log(
           hookId,
           "is unregistering and it is not the owner,",
           this.ownerByQueryKey[queryKey],
@@ -336,7 +351,7 @@ export class SubscriptionService {
      * listeners to this path.
      */
     const subscribe = () => {
-      console.log("subscribing", hookId)
+      this.log("doc hook", hookId, "subscribing to", path)
       if (this.ownerByDocPath[path]) {
         throw new Error(
           `Path ${path} is already owned by ${this.ownerByDocPath[path]}`
@@ -372,8 +387,8 @@ export class SubscriptionService {
      * there is one available or otherwise unsubscribe from snapshots.
      */
     const unsubscribe = () => {
-      console.log(
-        "unsubscribing",
+      this.log(
+        "unsubscribing hook",
         hookId,
         "owner is",
         this.ownerByDocPath[path]
@@ -388,7 +403,7 @@ export class SubscriptionService {
       // Give up ownership
       delete this.ownerByDocPath[path]
 
-      console.log("is there another owner?", assignNextOwner ? "yes" : "no")
+      this.log(path, "has another owner?", assignNextOwner ? "yes" : "no")
       // If there's someone else waiting to be the new owner, let 'em have the subscription
       if (assignNextOwner) {
         assignNextOwner()
@@ -405,7 +420,7 @@ export class SubscriptionService {
       }
 
       unsubscribeFromSnapshots()
-      console.log("unsubscribed from firestore")
+      this.log("unsubscribed from", path)
     }
 
     /**
@@ -413,12 +428,12 @@ export class SubscriptionService {
      * be ready to take over if needed.
      */
     const listen = () => {
-      console.log("listening", hookId)
+      this.log("listening", hookId)
       // There's already a document subscription, owned by someone else. Just
       // register ourselves as a potential next owner:
       assignDocOwnerFunctions.push(takeOwnership)
 
-      console.log(assignDocOwnerFunctions.length, "owners waiting on", path) ///
+      this.log(assignDocOwnerFunctions.length, "owners waiting on", path) ///
 
       const lastDoc = this.lastDocByPath[path]
 
@@ -426,13 +441,13 @@ export class SubscriptionService {
     }
 
     const takeOwnership = () => {
-      console.log(hookId, "is taking ownership of", path)
+      this.log(hookId, "is taking ownership of", path)
       if (this.unsubscribeFunctionsByDocPath[path]) {
         this.ownerByDocPath[path] = hookId
       } else {
         subscribe()
       }
-      console.log(
+      this.log(
         hookId,
         "now owns",
         path,
@@ -458,7 +473,7 @@ export class SubscriptionService {
 
       assignDocOwnerFunctions.splice(index, 1)
 
-      console.log(assignDocOwnerFunctions.length, "owners waiting")
+      this.log(assignDocOwnerFunctions.length, "owners waiting")
     }
 
     /**
@@ -466,19 +481,21 @@ export class SubscriptionService {
      * current subscription owner.
      */
     const unregister = () => {
-      console.log("unregistering", hookId)
+      const weAreTheOwner = this.ownerByDocPath[path] === hookId
+      this.log(
+        "unregistering",
+        hookId,
+        `(${weAreTheOwner ? "owner" : "not the owner"})`
+      )
       // First remove ourselves as a listener so we immediately stop sending snapshots to the callback
       removeListener()
 
-      if (this.ownerByDocPath[path] === hookId) {
+      if (weAreTheOwner) {
         // We wait a little bit before unsubscribing, just in case we're
         // navigating or something and we're about to get a new wave of hooks
         // that might want to take over ownership.
         setTimeout(unsubscribe, UNSUBSCRIBE_DELAY)
       } else {
-        console.log(
-          `we (${hookId}) are not the owner, ${this.ownerByDocPath[path]} is`
-        )
         ignoreOwnershipRequests()
       }
     }

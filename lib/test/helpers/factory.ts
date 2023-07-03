@@ -47,7 +47,7 @@ export async function setUpRepo(
 
   const slug = overrides.slug ?? `repo-${uniqueId}`
 
-  const ownerId = overrides.ownerId ?? `owner-for-${slug}`
+  const ownerId = overrides.ownerId ?? `owner-${uniqueId}`
 
   const properties = {
     ownerId,

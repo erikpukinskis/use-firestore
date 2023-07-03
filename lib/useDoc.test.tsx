@@ -1,9 +1,4 @@
-import {
-  fireEvent,
-  render,
-  waitFor,
-  waitForElementToBeRemoved,
-} from "@testing-library/react"
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react"
 import { renderHook } from "@testing-library/react-hooks"
 import {
   collection,
@@ -18,7 +13,16 @@ import {
 } from "firebase/firestore"
 import * as Firestore from "firebase/firestore"
 import React, { useState } from "react"
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest"
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  vi,
+  afterEach,
+  beforeEach,
+} from "vitest"
 import { DocsProvider } from "./DocsProvider"
 import { UNSUBSCRIBE_DELAY } from "./SubscriptionService"
 import { connectToEmulators, testApp } from "./test/helpers/connectToEmulators"
@@ -41,6 +45,10 @@ describe("useDoc", () => {
 
   afterAll(() => {
     vi.clearAllMocks()
+  })
+
+  beforeEach(() => {
+    cleanup()
   })
 
   it("returns a doc and provides a function to update it", async () => {
@@ -131,20 +139,16 @@ describe("useDoc", () => {
     )
   }
 
-  it.only("doesn't create another subscription if pulling doc that's already be pulled in a query", async () => {
+  it("reuses query subscription when pulling a doc in the query", async () => {
     const {
       repo: { ownerId },
     } = await factory.setUpRepo(testApp, { slug: "one", starCount: 850 })
-    await factory.setUpRepo(testApp, { ownerId: ownerId, slug: "two" })
 
     const { onSnapshot, unsubscribes } = mockSubscriptions()
 
-    const { getByRole, getByText, queryByRole } = render(
-      <ReposPage ownerId={ownerId} />,
-      {
-        wrapper: DocsProvider,
-      }
-    )
+    const { getByRole, getByText } = render(<ReposPage ownerId={ownerId} />, {
+      wrapper: DocsProvider,
+    })
 
     await waitFor(() => {
       expect(onSnapshot).toHaveBeenCalledTimes(1)
@@ -154,21 +158,38 @@ describe("useDoc", () => {
     fireEvent.click(getByRole("button", { name: "Expand one" }))
 
     await waitFor(() => getByText("850 stars"))
+    await sleep(UNSUBSCRIBE_DELAY) // just in case
 
-    fireEvent.click(getByRole("button", { name: "Focus mode" }))
+    expect(onSnapshot).toHaveBeenCalledTimes(1)
+    expect(unsubscribes).toHaveLength(0)
+  })
+
+  it("adds a doc subscription when the query unmounts", async () => {
+    const {
+      repo: { ownerId },
+    } = await factory.setUpRepo(testApp, { slug: "one", starCount: 2 })
+
+    const { onSnapshot, unsubscribes } = mockSubscriptions()
+
+    const { findByRole, queryByRole } = render(
+      <ReposPage ownerId={ownerId} />,
+      {
+        wrapper: DocsProvider,
+      }
+    )
+
+    fireEvent.click(await findByRole("button", { name: "Expand one" }))
+    fireEvent.click(await findByRole("button", { name: "Focus mode" }))
 
     expect(queryByRole("button", { name: "Expand one" })).toBeNull()
-
     expect(onSnapshot).toHaveBeenCalledTimes(1)
     expect(unsubscribes).toHaveLength(0)
 
     await sleep(UNSUBSCRIBE_DELAY)
 
-    expect(unsubscribes).toHaveLength(1)
     expect(onSnapshot).toHaveBeenCalledTimes(2)
+    expect(unsubscribes).toHaveLength(1)
   })
-
-  // it("adds doc subscription when query unmounts")
 
   function RepoRouter({
     id,
@@ -188,7 +209,7 @@ describe("useDoc", () => {
     return <div>Owned by {repo.ownerId}</div>
   }
 
-  it("hands off subscription to another listener during a navigation change", async () => {
+  it("hands off doc subscription to another hook during a navigation change", async () => {
     const { repo } = await factory.setUpRepo(testApp, {
       starCount: 1000,
       ownerId: "Kim",
