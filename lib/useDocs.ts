@@ -2,7 +2,7 @@ import type { DocumentData, Query } from "firebase/firestore"
 import { useEffect, useState } from "react"
 import { useSubscriptionService } from "./DocsProvider"
 import { serializeQuery } from "./serializeQuery"
-import type { DocumentWithId } from "./SubscriptionService"
+import type { CachedDocument } from "./SubscriptionService"
 import { useHookId } from "./useHookId"
 
 /**
@@ -30,7 +30,7 @@ import { useHookId } from "./useHookId"
  * A subscription to Firestore will be created for each unique query, and the
  * results of the hook will be updated in realtime.
  */
-export function useDocs<T extends DocumentWithId>(query: Query<DocumentData>) {
+export function useDocs<T extends CachedDocument>(query: Query<DocumentData>) {
   const [docs, setDocs] = useState<Array<T> | undefined>()
   const hookId = useHookId(query)
   const service = useSubscriptionService("useDocs")

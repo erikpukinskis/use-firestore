@@ -2,7 +2,7 @@ import type { DocumentData, DocumentReference, Query } from "firebase/firestore"
 import { onSnapshot } from "firebase/firestore"
 import { serializeQuery } from "./serializeQuery"
 
-export type DocumentWithId = DocumentData & { id: string }
+type CachedDocument = DocumentData & { id: string; __path: string }
 
 export const UNSUBSCRIBE_DELAY = 100
 
@@ -24,22 +24,22 @@ export class SubscriptionService {
   // For documents...
   ownerByDocPath: Record<string, string> = {}
   unsubscribeFunctionsByDocPath: Record<string, () => void> = {}
-  docListenersByPath: Record<string, Array<(doc: DocumentWithId) => void>> = {}
-  lastDocByPath: Record<string, DocumentWithId> = {}
+  docListenersByPath: Record<string, Array<(doc: CachedDocument) => void>> = {}
+  lastDocByPath: Record<string, CachedDocument> = {}
   assignDocOwnerFunctionsByPath: Record<string, Array<() => void>> = {}
 
   // For queries...
   ownerByQueryKey: Record<string, string> = {}
   unsubscribeFunctionsByQueryKey: Record<string, () => void> = {}
-  queryListenersByKey: Record<string, Array<(docs: DocumentWithId[]) => void>> =
+  queryListenersByKey: Record<string, Array<(docs: CachedDocument[]) => void>> =
     {}
-  lastQueryResultByKey: Record<string, Array<DocumentWithId>> = {}
+  lastQueryResultByKey: Record<string, Array<CachedDocument>> = {}
   assignQueryOwnerFunctionsByKey: Record<string, Array<() => void>> = {}
 
   registerQueryHook(
     hookId: string,
     query: Query<DocumentData>,
-    onDocs: (docs: DocumentWithId[]) => void
+    onDocs: (docs: CachedDocument[]) => void
   ) {
     const queryKey = serializeQuery(query)
 
@@ -85,11 +85,15 @@ export class SubscriptionService {
       const unsubscribeFromQuery = onSnapshot(query, (querySnapshot) => {
         const newPaths = new Set<string>()
 
-        const docs: DocumentWithId[] = []
+        const docs: CachedDocument[] = []
 
         querySnapshot.forEach((docSnapshot) => {
           const path = docSnapshot.ref.path
-          const doc = { id: docSnapshot.id, ...docSnapshot.data() }
+          const doc = {
+            id: docSnapshot.id,
+            __path: path,
+            ...docSnapshot.data(),
+          }
 
           newPaths.add(path)
           docs.push(doc)
@@ -149,7 +153,7 @@ export class SubscriptionService {
         return
       }
 
-      const assignNextOwner =
+      const assignNextQueryOwner =
         this.assignQueryOwnerFunctionsByKey[queryKey]?.shift()
 
       // Give up ownership
@@ -157,25 +161,46 @@ export class SubscriptionService {
 
       // If there's another hook waiting to be the new owner, let 'em have the
       // subscription
-      if (assignNextOwner) {
-        assignNextOwner()
-        return
+      if (assignNextQueryOwner) {
+        assignNextQueryOwner()
+      } else {
+        // Else shut it down
+        const unsubscribeFromSnapshots =
+          this.unsubscribeFunctionsByQueryKey[queryKey]
+
+        delete this.unsubscribeFunctionsByQueryKey[queryKey]
+
+        if (!unsubscribeFromSnapshots) {
+          const description = queryKey.slice(0, 50)
+          throw new Error(
+            `No unsubscribe function found for query ${description} even though ${hookId} is the owner?`
+          )
+        }
+
+        unsubscribeFromSnapshots()
       }
 
-      // Else shut it down
-      const unsubscribeFromSnapshots =
-        this.unsubscribeFunctionsByQueryKey[queryKey]
+      // Look for individual docs that we might be watching with useDoc hooks
+      // and assign ownership to them (so they subscribe to the individual doc)
+      // if needed.
+      for (const doc of this.lastQueryResultByKey[queryKey]) {
+        const docOwner = this.ownerByDocPath[doc.__path]
 
-      delete this.unsubscribeFunctionsByQueryKey[queryKey]
+        if (docOwner !== hookId) continue
 
-      if (!unsubscribeFromSnapshots) {
-        const description = queryKey.slice(0, 50)
-        throw new Error(
-          `No unsubscribe function found for query ${description} even though ${hookId} is the owner?`
-        )
+        // Give up ownership
+        delete this.ownerByDocPath[doc.__path]
+
+        const assignNextDocOwner =
+          this.assignDocOwnerFunctionsByPath[doc.__path]?.shift()
+
+        if (!assignNextDocOwner) {
+          console.log("no possible owners for", doc.__path)
+          continue
+        }
+
+        assignNextDocOwner()
       }
-
-      unsubscribeFromSnapshots()
     }
 
     /**
@@ -214,7 +239,6 @@ export class SubscriptionService {
       )
 
       if (index < 0) {
-        debugger
         throw new Error(
           `Take-ownership-function for hook ${hookId} was already gone before unlisten() was called`
         )
@@ -254,7 +278,7 @@ export class SubscriptionService {
       }
     }
 
-    let cachedResults: DocumentWithId[] | undefined
+    let cachedResults: CachedDocument[] | undefined
 
     // If there's already an owner for this query, we just listen to their
     // results. Otherwise we create a new subscription.
@@ -271,7 +295,7 @@ export class SubscriptionService {
   registerDocHook(
     hookId: string,
     ref: DocumentReference<DocumentData>,
-    onDoc: (doc: DocumentWithId) => void
+    onDoc: (doc: CachedDocument) => void
   ) {
     const path = ref.path
 
@@ -329,7 +353,7 @@ export class SubscriptionService {
         const newDoc = {
           id: ref.id,
           ...snapshot.data(),
-        } as DocumentWithId
+        } as CachedDocument
 
         this.lastDocByPath[path] = newDoc
 
@@ -394,7 +418,7 @@ export class SubscriptionService {
       // register ourselves as a potential next owner:
       assignDocOwnerFunctions.push(takeOwnership)
 
-      console.log(assignDocOwnerFunctions.length, "owners waiting")
+      console.log(assignDocOwnerFunctions.length, "owners waiting on", path) ///
 
       const lastDoc = this.lastDocByPath[path]
 
@@ -403,12 +427,16 @@ export class SubscriptionService {
 
     const takeOwnership = () => {
       console.log(hookId, "is taking ownership of", path)
-      this.ownerByDocPath[path] = hookId
+      if (this.unsubscribeFunctionsByDocPath[path]) {
+        this.ownerByDocPath[path] = hookId
+      } else {
+        subscribe()
+      }
       console.log(
         hookId,
         "now owns",
         path,
-        "possible owners were",
+        "remaining owners are",
         assignDocOwnerFunctions
       )
     }
@@ -455,7 +483,7 @@ export class SubscriptionService {
       }
     }
 
-    let cachedDoc: DocumentWithId | undefined
+    let cachedDoc: CachedDocument | undefined
 
     if (this.ownerByDocPath[path]) {
       cachedDoc = this.lastDocByPath[path]
