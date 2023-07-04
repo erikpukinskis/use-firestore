@@ -20,7 +20,6 @@ import {
   beforeAll,
   afterAll,
   vi,
-  afterEach,
   beforeEach,
 } from "vitest"
 import { DocsProvider } from "./DocsProvider"
@@ -116,7 +115,7 @@ describe("useDoc", () => {
     ownerId: string
     onClickRepo(id: string): void
   }) {
-    const repos = useDocs(
+    const repos = useDocs<Repo>(
       query(
         collection(getFirestore(testApp), "repos"),
         where("ownerId", "==", ownerId)

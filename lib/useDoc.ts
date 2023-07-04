@@ -2,7 +2,6 @@ import type { DocumentData, DocumentReference } from "firebase/firestore"
 import { updateDoc } from "firebase/firestore"
 import { useEffect, useState } from "react"
 import { useSubscriptionService } from "./DocsProvider"
-import type { CachedDocument } from "./SubscriptionService"
 import { useHookId } from "./useHookId"
 
 /**
@@ -30,7 +29,7 @@ import { useHookId } from "./useHookId"
  *
  * @returns a `[doc, updateDoc]` tuple, similar to what `useState` returns.
  */
-export function useDoc<T extends CachedDocument>(ref: DocumentReference) {
+export function useDoc<T extends { id: string }>(ref: DocumentReference) {
   const [doc, setDoc] = useState<T | undefined>()
   const hookId = useHookId(ref)
   const service = useSubscriptionService("useDoc")
@@ -42,11 +41,11 @@ export function useDoc<T extends CachedDocument>(ref: DocumentReference) {
       hookId,
       ref,
       (doc) => {
-        setDoc(doc as T)
+        setDoc(doc as unknown as T)
       }
     )
 
-    if (doc) setDoc(doc as T)
+    if (doc) setDoc(doc as unknown as T)
 
     return unregister
   }, [path])

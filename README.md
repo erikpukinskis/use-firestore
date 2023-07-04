@@ -102,8 +102,23 @@ import { useDoc } from "use-firestore"
 import { query, getFirestore } from "firebase/firestore"
 import { groupBy } from "lodash"
 
-const [repo, updateRepo = useDoc<Repo>(doc(getFirestore(testApp), "repos", repoId))
+function Repo({ repoId }) {
+  const [repo, updateRepo] = useDoc<Repo>(
+    doc(getFirestore(testApp), "repos", repoId)
+  )
 
+  return (
+    <input
+      type="text"
+      value={repo.name}
+      onChange={(event) => {
+        updateRepo({
+          name: event.target.value,
+        })
+      }}
+    />
+  )
+}
 ```
 
 ### Why
