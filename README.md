@@ -1,4 +1,8 @@
-**use-firestore** provides a set of React hooks which let you load Firestore
+<p align="center">
+<img src="./icon.png" width="128" height="128" alt="the use-firestore logo, a painting of a red can with a flame on the label" />
+</p>
+
+<b>use-firestore</b> provides a set of React hooks which let you load Firestore
 data at the component level.
 
 **Table of Contents**
@@ -38,7 +42,7 @@ const users = useDocs<Users>(query)
 A subscription to Firestore will be created for each unique query, and the
 results of the hook will be updated in realtime.
 
-### Example code
+### `useDocs` hook
 
 ```tsx
 import { useDocs, useGlobalMemo } from "use-firestore"
@@ -89,6 +93,32 @@ const users = useGlobalMemo("users", () => userDocs.map((user)) => ({
   ...user,
   assignments: assignmentsByUserId[user.id] ?? []
 }), [userDocs, assignmentsById])
+```
+
+### `useDoc` hook
+
+```tsx
+import { useDoc } from "use-firestore"
+import { query, getFirestore } from "firebase/firestore"
+import { groupBy } from "lodash"
+
+function Repo({ repoId }) {
+  const [repo, updateRepo] = useDoc<Repo>(
+    doc(getFirestore(testApp), "repos", repoId)
+  )
+
+  return (
+    <input
+      type="text"
+      value={repo.name}
+      onChange={(event) => {
+        updateRepo({
+          name: event.target.value,
+        })
+      }}
+    />
+  )
+}
 ```
 
 ### Why
@@ -161,5 +191,7 @@ Additionally, if we were to use that `tags` array as a prop to a memoized compon
 
 ### Todo
 
-- [ ] Unsubscribe from query when no more listeners are left
-- [ ] Add tests
+- [x] Unsubscribe from query when no more listeners are left
+- [x] Add tests
+- [ ] useAssociationLookup()
+- [ ] useCascadingDelete()
