@@ -19,7 +19,7 @@ import {
   beforeEach,
 } from "vitest"
 import { DocsProvider } from "./DocsProvider"
-import { UNSUBSCRIBE_DELAY } from "./SubscriptionService"
+import { UNSUBSCRIBE_DELAY } from "./QueryService"
 import { connectToEmulators, testApp } from "./test/helpers/connectToEmulators"
 import { mockSubscriptions } from "./test/helpers/mockSubscriptions"
 import { useDoc } from "./useDoc"

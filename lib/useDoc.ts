@@ -1,7 +1,7 @@
 import type { DocumentData, DocumentReference } from "firebase/firestore"
 import { updateDoc } from "firebase/firestore"
 import { useEffect, useState } from "react"
-import { useSubscriptionService } from "./DocsProvider"
+import { useQueryService } from "./DocsProvider"
 import { useHookId } from "./useHookId"
 
 /**
@@ -32,7 +32,7 @@ import { useHookId } from "./useHookId"
 export function useDoc<T extends { id: string }>(ref: DocumentReference) {
   const [doc, setDoc] = useState<T | undefined>()
   const hookId = useHookId(ref)
-  const service = useSubscriptionService("useDoc")
+  const service = useQueryService("useDoc")
 
   const path = ref.path
 

@@ -3,9 +3,9 @@ import {
   isInitialized,
   makeUninitializedContext,
 } from "./makeUninitializedContext"
-import { SubscriptionService } from "./SubscriptionService"
+import { QueryService } from "./QueryService"
 
-const DocsContext = createContext<SubscriptionService>(
+const DocsContext = createContext<QueryService>(
   makeUninitializedContext(
     "The useDoc and useQuery hooks do not work outside of a DocsProvider"
   )
@@ -17,12 +17,12 @@ type DocsProviderProps = {
 }
 
 export function DocsProvider({ children, debug = false }: DocsProviderProps) {
-  const [service] = useState(() => new SubscriptionService(debug))
+  const [service] = useState(() => new QueryService(debug))
 
   return <DocsContext.Provider value={service}>{children}</DocsContext.Provider>
 }
 
-export function useSubscriptionService(hookName: string) {
+export function useQueryService(hookName: string) {
   const context = useContext(DocsContext)
 
   if (!isInitialized(context)) {

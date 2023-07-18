@@ -11,7 +11,7 @@ function red(text: string) {
 }
 
 /**
- * The SubscriptionService keeps track of:
+ * The QueryService keeps track of:
  *
  * 1) Which hooks are currently listening for changes to queries or individual
  *    documents
@@ -24,7 +24,7 @@ function red(text: string) {
  * The service manages handoffs between those subscriptions, and fires up new
  * subscriptions as needed, to keep all of the hooks fed with up-to-date data.
  */
-export class SubscriptionService {
+export class QueryService {
   debug: boolean
 
   // For documents...
