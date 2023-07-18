@@ -4,11 +4,11 @@ import { collection, getFirestore, query, where } from "firebase/firestore"
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
 import { DocsProvider } from "./DocsProvider"
 import { connectToEmulators, testApp } from "./test/helpers/connectToEmulators"
-import { useDocs } from "./useDocs"
+import { useQuery } from "./useQuery"
 import * as factory from "~/test/helpers/factory"
 import type { Repo } from "~/test/helpers/factory"
 
-describe("useDocs", () => {
+describe("useQuery", () => {
   connectToEmulators(beforeAll, afterAll)
 
   it("returns a doc", async () => {
@@ -18,7 +18,7 @@ describe("useDocs", () => {
 
     const { result } = renderHook(
       () =>
-        useDocs<Repo>(
+        useQuery<Repo>(
           query(
             collection(getFirestore(testApp), "repos"),
             where("ownerId", "==", "talia")

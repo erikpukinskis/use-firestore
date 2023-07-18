@@ -24,15 +24,15 @@ import { useHookId } from "./useHookId"
  *
  * You can provide a type assertion as well:
  *
- *       const users = useDocs<Users>(query)
+ *       const users = useQuery<Users>(query)
  *
  * A subscription to Firestore will be created for each unique query, and the
  * results of the hook will be updated in realtime.
  */
-export function useDocs<T extends { id: string }>(query: Query<DocumentData>) {
+export function useQuery<T extends { id: string }>(query: Query<DocumentData>) {
   const [docs, setDocs] = useState<Array<T> | undefined>()
   const hookId = useHookId(query)
-  const service = useSubscriptionService("useDocs")
+  const service = useSubscriptionService("useQuery")
 
   useEffect(() => {
     const { unregister, cachedResults } = service.registerQueryHook(

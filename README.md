@@ -36,16 +36,16 @@ The returned documents will be normal JavaScript objects like:
 You can provide a type assertion as well:
 
 ```ts
-const users = useDocs<Users>(query)
+const users = useQuery<Users>(query)
 ```
 
 A subscription to Firestore will be created for each unique query, and the
 results of the hook will be updated in realtime.
 
-### `useDocs` hook
+### `useQuery` hook
 
 ```tsx
-import { useDocs, useGlobalMemo } from "use-firestore"
+import { useQuery, useGlobalMemo } from "use-firestore"
 import { query, getFirestore } from "firebase/firestore"
 
 type User = {
@@ -58,7 +58,7 @@ type User = {
 export function App() {
   const [teamId] = useQueryParam("teamId")
 
-  const users = useDocs(
+  const users = useQuery(
     query(collection(getFirestore(app), "users"), where("teamId", "==", teamId))
   )
 
@@ -73,11 +73,11 @@ If you would like to create some sort of derived state from your Firestore data,
 For example, if you have a "users" collection and each user has N "assignments", you can wire this up the following way, such that you only query Firebase twice, and get an array of users each with an array of assignments:
 
 ```tsx
-import { useDocs, useGlobalMemo } from "use-firestore"
+import { useQuery, useGlobalMemo } from "use-firestore"
 import { query, getFirestore } from "firebase/firestore"
 import { groupBy } from "lodash"
 
-const assignments = useDocs(
+const assignments = useQuery(
   query(collection(getFirestore(app), "assignments"))
 )
 
@@ -85,7 +85,7 @@ const assignmentsByUserId = useGlobalMemo("assignmentsByUserId", () => {
   return groupBy(assignments, "userId")
 }, [assignments])
 
-const userDocs = useDocs(
+const userDocs = useQuery(
   query(collection(getFirestore(app), "users"))
 )
 
@@ -139,12 +139,12 @@ For example, if I have a collection of stories, each of which has a number of ta
 Instead of copying the tags onto every story, you can efficiently maintain an index of tags to be looked up at the row level:
 
 ```tsx
-import { useDocs, useGlobalMemo } from "use-firestore"
+import { useQuery, useGlobalMemo } from "use-firestore"
 import { query, getFirestore } from "firebase/firestore"
 import { keyBy } from "lodash"
 
 function StoryTable() {
-  const stories = useDocs(query(collection(getFirestore(app), "stories")))
+  const stories = useQuery(query(collection(getFirestore(app), "stories")))
 
   if (!stories) return null
 
@@ -158,7 +158,7 @@ function StoryTable() {
 }
 
 function StoryRow({ title, tagIds }) {
-  const tags = useDocs(query(collection(getFirestore(app), "tags")))
+  const tags = useQuery(query(collection(getFirestore(app), "tags")))
   const tagsById = useGlobalMemo("tagsById", () => tags && keyBy(tags), [tags])
 
   if (!tagsById) return null
@@ -193,5 +193,6 @@ Additionally, if we were to use that `tags` array as a prop to a memoized compon
 
 - [x] Unsubscribe from query when no more listeners are left
 - [x] Add tests
-- [ ] useAssociationLookup()
+- [ ] useQuery() with smart caching
 - [ ] useCascadingDelete()
+- [ ] For small collections, just query the entire thing instead of just getting a subset

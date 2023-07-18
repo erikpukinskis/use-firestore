@@ -7,7 +7,7 @@ import { SubscriptionService } from "./SubscriptionService"
 
 const DocsContext = createContext<SubscriptionService>(
   makeUninitializedContext(
-    "The useDoc and useDocs hooks do not work outside of a DocsProvider"
+    "The useDoc and useQuery hooks do not work outside of a DocsProvider"
   )
 )
 

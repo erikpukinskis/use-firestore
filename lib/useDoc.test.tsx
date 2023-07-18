@@ -26,7 +26,7 @@ import { DocsProvider } from "./DocsProvider"
 import { UNSUBSCRIBE_DELAY } from "./SubscriptionService"
 import { connectToEmulators, testApp } from "./test/helpers/connectToEmulators"
 import { useDoc } from "./useDoc"
-import { useDocs } from "./useDocs"
+import { useQuery } from "./useQuery"
 import * as factory from "~/test/helpers/factory"
 import type { Repo } from "~/test/helpers/factory"
 
@@ -115,7 +115,7 @@ describe("useDoc", () => {
     ownerId: string
     onClickRepo(id: string): void
   }) {
-    const repos = useDocs<Repo>(
+    const repos = useQuery<Repo>(
       query(
         collection(getFirestore(testApp), "repos"),
         where("ownerId", "==", ownerId)
