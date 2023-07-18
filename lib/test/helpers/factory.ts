@@ -4,6 +4,7 @@ import { addDoc, collection, getFirestore } from "firebase/firestore"
 export type Tag = {
   id: string
   text: string
+  color: string
 }
 
 let tagIndex = 0
@@ -13,6 +14,7 @@ export async function setUpTag(app: FirebaseApp, overrides: Partial<Tag> = {}) {
 
   const properties = {
     text: `Tag No.${tagIndex}`,
+    color: "green",
     ...overrides,
   }
 

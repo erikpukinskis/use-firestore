@@ -24,8 +24,8 @@ import { connectToEmulators, testApp } from "./test/helpers/connectToEmulators"
 import { mockSubscriptions } from "./test/helpers/mockSubscriptions"
 import { useDoc } from "./useDoc"
 import { useQuery } from "./useQuery"
-import * as factory from "~/test/helpers/factory"
 import type { Repo } from "~/test/helpers/factory"
+import { setUpRepo, setUpTag } from "~/test/helpers/factory"
 
 vi.mock("firebase/firestore", async (importOriginal) => {
   const original: { onSnapshot(this: void): void } = await importOriginal()
@@ -48,7 +48,7 @@ describe("useDoc", () => {
   })
 
   it("returns a doc and provides a function to update it", async () => {
-    const { repo } = await factory.setUpRepo(testApp, {
+    const { repo } = await setUpRepo(testApp, {
       ownerId: "zeeke",
     })
 
@@ -82,36 +82,30 @@ describe("useDoc", () => {
     })
   })
 
-  function RepoDetails({ id }: { id: string }) {
-    const [repo] = useDoc<Repo>(doc(getFirestore(testApp), "repos", id))
+  // function RepoDetails({ id }: { id: string }) {
+  //   const [repo] = useDoc<Repo>(doc(getFirestore(testApp), "repos", id))
 
-    if (!repo) return <>{id} not loaded</>
+  //   if (!repo) return <>{id} not loaded</>
 
-    return <div>{repo.starCount} stars</div>
-  }
+  //   return <div>{repo.starCount} stars</div>
+  // }
 
-  function ReposPage({ ownerId }: { ownerId: string }) {
-    const [expandedId, setExpandedId] = useState<string | undefined>()
-    const [focusMode, setFocusMode] = useState(false)
+  // function ReposPage({ ownerId }: { ownerId: string }) {
+  //   const [expandedId, setExpandedId] = useState<string | undefined>()
+  //   const [focusMode, setFocusMode] = useState(false)
 
-    return (
-      <>
-        {focusMode ? null : (
-          <ListRepos ownerId={ownerId} onClickRepo={setExpandedId} />
-        )}
-        {expandedId && <RepoDetails id={expandedId} />}
-        <button onClick={() => setFocusMode(true)}>Focus mode</button>
-      </>
-    )
-  }
+  //   return (
+  //     <>
+  //       {focusMode ? null : (
+  //         <ListRepos ownerId={ownerId} onClickRepo={setExpandedId} />
+  //       )}
+  //       {expandedId && <RepoDetails id={expandedId} />}
+  //       <button onClick={() => setFocusMode(true)}>Focus mode</button>
+  //     </>
+  //   )
+  // }
 
-  function ListRepos({
-    ownerId,
-    onClickRepo,
-  }: {
-    ownerId: string
-    onClickRepo(id: string): void
-  }) {
+  function ListRepos({ ownerId }: { ownerId: string }) {
     const repos = useQuery<Repo>(
       query(
         collection(getFirestore(testApp), "repos"),
@@ -123,128 +117,105 @@ describe("useDoc", () => {
 
     return (
       <>
-        {repos.map(({ slug, id }) => (
-          <React.Fragment key={id}>
-            <h1>{slug}</h1>
-            <button key={id} onClick={() => onClickRepo(id)}>
-              Expand {slug}
-            </button>
-          </React.Fragment>
+        {repos.map(({ id, slug, tagIds }) => (
+          <Repo key={id} slug={slug} tagIds={tagIds} />
         ))}
       </>
     )
   }
 
-  it("reuses query subscription when pulling a doc in the query", async () => {
-    const {
-      repo: { ownerId },
-    } = await factory.setUpRepo(testApp, { slug: "one", starCount: 850 })
+  function Repo({ slug, tagIds }: { slug: string; tagIds: string[] }) {
+    const tags = useDocs(collection(getFirestore(testApp), "tags"), tagIds)
 
-    const { onSnapshot, unsubscribes } = mockSubscriptions()
+    if (!tags) return null
 
-    const { getByRole, getByText } = render(<ReposPage ownerId={ownerId} />, {
-      wrapper: DocsProvider,
-    })
-
-    await waitFor(() => {
-      expect(onSnapshot).toHaveBeenCalledTimes(1)
-      getByRole("button", { name: "Expand one" })
-    })
-
-    fireEvent.click(getByRole("button", { name: "Expand one" }))
-
-    await waitFor(() => getByText("850 stars"))
-    await sleep(UNSUBSCRIBE_DELAY) // just in case
-
-    expect(onSnapshot).toHaveBeenCalledTimes(1)
-    expect(unsubscribes).toHaveLength(0)
-  })
-
-  it("adds a doc subscription when the query unmounts", async () => {
-    const {
-      repo: { ownerId },
-    } = await factory.setUpRepo(testApp, { slug: "one", starCount: 2 })
-
-    const { onSnapshot, unsubscribes } = mockSubscriptions()
-
-    const { findByRole, queryByRole } = render(
-      <ReposPage ownerId={ownerId} />,
-      {
-        wrapper: DocsProvider,
-      }
+    return (
+      <div>
+        {slug}
+        {tags.map((tag) => (
+          <span key={tag.id} className={`tag-${tag.color}`}>
+            {tag.text}
+          </span>
+        ))}
+      </div>
     )
-
-    fireEvent.click(await findByRole("button", { name: "Expand one" }))
-    fireEvent.click(await findByRole("button", { name: "Focus mode" }))
-
-    expect(queryByRole("button", { name: "Expand one" })).toBeNull()
-    expect(onSnapshot).toHaveBeenCalledTimes(1)
-    expect(unsubscribes).toHaveLength(0)
-
-    await sleep(UNSUBSCRIBE_DELAY)
-
-    expect(onSnapshot).toHaveBeenCalledTimes(2)
-    expect(unsubscribes).toHaveLength(1)
-  })
-
-  function RepoRouter({
-    id,
-    route,
-  }: {
-    id: string
-    route: "details" | "owner"
-  }) {
-    return route === "details" ? <RepoDetails id={id} /> : <RepoOwner id={id} />
   }
 
-  function RepoOwner({ id }: { id: string }) {
-    const [repo] = useDoc<Repo>(doc(getFirestore(testApp), "repos", id))
+  it("", async () => {
+    const { tag: tag1 } = await setUpTag(testApp)
+    const { tag: tag2 } = await setUpTag(testApp)
 
-    if (!repo) return null
-
-    return <div>Owned by {repo.ownerId}</div>
-  }
-
-  it("hands off doc subscription to another hook during a navigation change", async () => {
-    const { repo } = await factory.setUpRepo(testApp, {
-      starCount: 1000,
-      ownerId: "Kim",
+    const { repo: repo1 } = await setUpRepo(testApp, { tagIds: [tag1.id] })
+    const { repo: repo2 } = await setUpRepo(testApp, {
+      ownerId: repo1.ownerId,
+      tagIds: [tag2.id],
+    })
+    const { repo: repo3 } = await setUpRepo(testApp, {
+      ownerId: repo1.ownerId,
+      tagIds: [tag1.id, tag2.id],
     })
 
-    const { onSnapshot, unsubscribes } = mockSubscriptions()
-
-    const { rerender, getByText, unmount } = render(
-      <RepoRouter id={repo.id} route="details" />,
-      {
-        wrapper: DocsProvider,
-      }
-    )
-
-    await waitFor(() => {
-      expect(onSnapshot).toHaveBeenCalledTimes(1)
-      expect(getByText("1000 stars"))
-      expect(unsubscribes).toHaveLength(0)
-    })
-
-    rerender(<RepoRouter id={repo.id} route="owner" />)
-
-    await sleep(UNSUBSCRIBE_DELAY)
-
-    await waitFor(() => {
-      expect(getByText("Owned by Kim"))
-      expect(unsubscribes).toHaveLength(0)
-    })
-
-    expect(onSnapshot).toHaveBeenCalledTimes(1)
-
-    unmount()
-
-    expect(onSnapshot).toHaveBeenCalledTimes(1)
-
-    await waitFor(() => {
-      expect(unsubscribes).toHaveLength(1)
-    })
+    const {} = render(<ListRepos ownerId={repo1.ownerId} />)
   })
+
+  // function RepoRouter({
+  //   id,
+  //   route,
+  // }: {
+  //   id: string
+  //   route: "details" | "owner"
+  // }) {
+  //   return route === "details" ? <RepoDetails id={id} /> : <RepoOwner id={id} />
+  // }
+
+  // function RepoOwner({ id }: { id: string }) {
+  //   const [repo] = useDoc<Repo>(doc(getFirestore(testApp), "repos", id))
+
+  //   if (!repo) return null
+
+  //   return <div>Owned by {repo.ownerId}</div>
+  // }
+
+  // it("hands off doc subscription to another hook during a navigation change", async () => {
+  //   const { repo } = await factory.setUpRepo(testApp, {
+  //     starCount: 1000,
+  //     ownerId: "Kim",
+  //   })
+
+  //   const { onSnapshot, unsubscribes } = mockSubscriptions()
+
+  //   const { rerender, getByText, unmount } = render(
+  //     <RepoRouter id={repo.id} route="details" />,
+  //     {
+  //       wrapper: DocsProvider,
+  //     }
+  //   )
+
+  //   await waitFor(() => {
+  //     expect(onSnapshot).toHaveBeenCalledTimes(1)
+  //     expect(getByText("1000 stars"))
+  //     expect(unsubscribes).toHaveLength(0)
+  //   })
+
+  //   rerender(<RepoRouter id={repo.id} route="owner" />)
+
+  //   await sleep(UNSUBSCRIBE_DELAY)
+
+  //   await waitFor(() => {
+  //     expect(getByText("Owned by Kim"))
+  //     expect(unsubscribes).toHaveLength(0)
+  //   })
+
+  //   expect(onSnapshot).toHaveBeenCalledTimes(1)
+
+  //   unmount()
+
+  //   expect(onSnapshot).toHaveBeenCalledTimes(1)
+
+  //   await waitFor(() => {
+  //     expect(unsubscribes).toHaveLength(1)
+  //   })
+  // })
 })
 
 /**

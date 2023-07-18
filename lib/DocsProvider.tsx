@@ -1,11 +1,17 @@
 import { createContext, useContext, useState } from "react"
+import { CollectionService } from "./CollectionService"
 import {
   isInitialized,
   makeUninitializedContext,
 } from "./makeUninitializedContext"
 import { QueryService } from "./QueryService"
 
-const DocsContext = createContext<QueryService>(
+type DocsContextValueType = {
+  queryService: QueryService
+  collectionService: CollectionService
+}
+
+const DocsContext = createContext<DocsContextValueType>(
   makeUninitializedContext(
     "The useDoc and useQuery hooks do not work outside of a DocsProvider"
   )
@@ -17,9 +23,14 @@ type DocsProviderProps = {
 }
 
 export function DocsProvider({ children, debug = false }: DocsProviderProps) {
-  const [service] = useState(() => new QueryService(debug))
+  const [services] = useState(() => ({
+    queryService: new QueryService(debug),
+    collectionService: new CollectionService(debug),
+  }))
 
-  return <DocsContext.Provider value={service}>{children}</DocsContext.Provider>
+  return (
+    <DocsContext.Provider value={services}>{children}</DocsContext.Provider>
+  )
 }
 
 export function useQueryService(hookName: string) {
@@ -29,5 +40,15 @@ export function useQueryService(hookName: string) {
     throw new Error(`${hookName} cannot be used outside of a DocsProvider`)
   }
 
-  return context
+  return context.queryService
+}
+
+export function useCollectionService(hookName: string) {
+  const context = useContext(DocsContext)
+
+  if (!isInitialized(context)) {
+    throw new Error(`${hookName} cannot be used outside of a DocsProvider`)
+  }
+
+  return context.collectionService
 }
