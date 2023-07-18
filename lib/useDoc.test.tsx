@@ -7,11 +7,7 @@ import {
   getFirestore,
   query,
   where,
-  type DocumentReference,
-  type DocumentSnapshot,
-  type Unsubscribe,
 } from "firebase/firestore"
-import * as Firestore from "firebase/firestore"
 import React, { useState } from "react"
 import {
   describe,
@@ -25,6 +21,7 @@ import {
 import { DocsProvider } from "./DocsProvider"
 import { UNSUBSCRIBE_DELAY } from "./SubscriptionService"
 import { connectToEmulators, testApp } from "./test/helpers/connectToEmulators"
+import { mockSubscriptions } from "./test/helpers/mockSubscriptions"
 import { useDoc } from "./useDoc"
 import { useQuery } from "./useQuery"
 import * as factory from "~/test/helpers/factory"
@@ -258,40 +255,4 @@ describe("useDoc", () => {
  */
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-let onSnapshotCallCount = 0
-const originalOnSnapshot = Firestore.onSnapshot
-
-/**
- * Mocks the Firestore onSnapshot function
- */
-function mockSubscriptions() {
-  const unsubscribes: number[] = []
-
-  function mockOnSnapshot<T>(
-    reference: DocumentReference<T>,
-    onNext: (snapshot: DocumentSnapshot<T>) => void
-    // onError?: (error: FirestoreError) => void,
-    // onCompletion?: () => void
-  ): Unsubscribe {
-    const originalUnsubscribe = originalOnSnapshot(reference, onNext)
-    const callId = onSnapshotCallCount++
-
-    const mockUnsubscribe = () => {
-      unsubscribes.push(callId)
-      originalUnsubscribe()
-    }
-
-    return mockUnsubscribe
-  }
-
-  const onSnapshot = vi
-    .spyOn(Firestore, "onSnapshot")
-    // Not sure why TypeScript is unhappy with the mockOnSnapshot signature.
-    // It seems to only be wanting a query not a reference?
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-    .mockImplementation(mockOnSnapshot as any)
-
-  return { onSnapshot, unsubscribes }
 }
