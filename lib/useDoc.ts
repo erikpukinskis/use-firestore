@@ -5,7 +5,7 @@ import type {
 } from "firebase/firestore"
 import { updateDoc } from "firebase/firestore"
 import { useEffect, useState } from "react"
-import { useCollectionService, useQueryService } from "./DocsProvider"
+import { useCollectionService } from "./DocsProvider"
 import { useHookId } from "./useHookId"
 
 /**
@@ -41,7 +41,7 @@ export function useDoc<T extends { id: string }>(ref: DocumentReference) {
   const path = ref.path
 
   useEffect(() => {
-    const { unregister, cachedDoc: doc } = service.registerDocsHook(
+    const { unregister, cachedDocs } = service.registerDocsHook(
       hookId,
       ref.parent,
       [ref.id],
@@ -50,7 +50,7 @@ export function useDoc<T extends { id: string }>(ref: DocumentReference) {
       }
     )
 
-    if (doc) setDoc(doc as unknown as T)
+    if (cachedDocs) setDoc(cachedDocs[0] as unknown as T)
 
     return unregister
   }, [path])

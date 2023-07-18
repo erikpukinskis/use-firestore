@@ -6,12 +6,12 @@ import {
 } from "./makeUninitializedContext"
 import { QueryService } from "./QueryService"
 
-type DocsContextValueType = {
+type SubscriptionServices = {
   queryService: QueryService
   collectionService: CollectionService
 }
 
-const DocsContext = createContext<DocsContextValueType>(
+const DocsContext = createContext<SubscriptionServices>(
   makeUninitializedContext(
     "The useDoc and useQuery hooks do not work outside of a DocsProvider"
   )
