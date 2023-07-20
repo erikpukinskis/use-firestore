@@ -60,7 +60,8 @@
     "start:docs:dev": "vite serve docs --config vite.docs.config.js",
     "start:emulators": "firebase emulators:start",
     "test": "vitest run --config vite.test.config.js",
-    "watch:test": "vitest watch --config vite.test.config.js"
+    "test:ci": "firebase emulators:exec \"vitest run --config vite.test.config.js\"",
+    "test:watch": "vitest watch --config vite.test.config.js"
   },
   "packageManager": "yarn@1.22.19"
 }
