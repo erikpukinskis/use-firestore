@@ -47,7 +47,7 @@ describe("useDoc", () => {
     cleanup()
   })
 
-  it("returns a doc and provides a function to update it", async () => {
+  it.only("returns a doc and provides a function to update it", async () => {
     const { repo } = await setUpRepo(testApp, {
       ownerId: "zeeke",
     })
@@ -61,11 +61,11 @@ describe("useDoc", () => {
 
     expect(result.current).toHaveLength(2)
 
-    await waitFor(() =>
+    await waitFor(() => {
       expect(result.current[0]).toMatchObject({
         ownerId: "zeeke",
       })
-    )
+    })
 
     const update = result.current[1]
 
@@ -141,7 +141,7 @@ describe("useDoc", () => {
     )
   }
 
-  it("", async () => {
+  it("batches docs into a single subscription", async () => {
     const { tag: tag1 } = await setUpTag(testApp)
     const { tag: tag2 } = await setUpTag(testApp)
 
@@ -155,7 +155,9 @@ describe("useDoc", () => {
       tagIds: [tag1.id, tag2.id],
     })
 
-    const {} = render(<ListRepos ownerId={repo1.ownerId} />)
+    const {} = render(<ListRepos ownerId={repo1.ownerId} />, {
+      wrapper: DocsProvider,
+    })
   })
 
   // function RepoRouter({

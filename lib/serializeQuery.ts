@@ -13,7 +13,7 @@ import type { DocumentData, Query } from "firebase/firestore"
  *
  * `serializeQuery` will return:
  *
- *           "path=stories&filters=ownerUid==abc123,projectId==xyz"
+ *           "stories?filter=ownerUid==abc123&projectId==xyz"
  */
 export function serializeQuery(query: Query<DocumentData>) {
   const { _query } = query as Firestore3Query
@@ -22,25 +22,25 @@ export function serializeQuery(query: Query<DocumentData>) {
     const path = _query.path.segments.join("/")
 
     const orders = _query.explicitOrderBy
-      .map(({ dir, field: { segments } }) => `${dir}-${segments.join("/")}`)
+      .map(({ dir, field: { segments } }) => `${segments.join("/")}:${dir}`)
       .join(",")
 
-    const filters = _query.filters
-      .map((filter) => {
-        if (isSingleFilter(filter)) {
-          return serializeFilter(filter)
-        } else {
-          return serializeCompoundFilter(filter)
-        }
-      })
-      .join(" && ")
+    const filters = _query.filters.map((filter) => {
+      if (isSingleFilter(filter)) {
+        return serializeFilter(filter)
+      } else {
+        return serializeCompoundFilter(filter)
+      }
+    })
+
+    filters.sort()
 
     const { limit, limitType, startAt, endAt } = _query
 
-    const parameters = [`path=${path}`]
+    const parameters = []
 
-    if (orders.length) parameters.push(`orders=${orders}`)
-    if (filters.length) parameters.push(`filters=${filters}`)
+    if (orders.length) parameters.push(`order=${orders}`)
+    if (filters.length) parameters.push(`filter=${filters.join("&filter=")}`)
     if (limit != null)
       parameters.push(
         `limit=${serialize(limit)}`,
@@ -49,7 +49,7 @@ export function serializeQuery(query: Query<DocumentData>) {
     if (startAt != null) parameters.push(`startAt=${serialize(startAt)}`)
     if (endAt != null) parameters.push(`endAt=${serialize(endAt)}`)
 
-    return parameters.join("&")
+    return `${path}?${parameters.join("&")}`
   } catch (e) {
     console.error(
       `Error serializing query:\n${JSON.stringify(_query, null, 4)}`
@@ -71,7 +71,7 @@ function serializeFilter(filter: SingleFilter) {
     value,
   } = filter
 
-  return `${segments.join("/")}${op}${serialize(Object.values(value)[0])}`
+  return `${segments.join("/")}+${op}+${serialize(Object.values(value)[0])}`
 }
 
 /**
@@ -94,6 +94,7 @@ type Firestore3Query = Query<DocumentData> & {
   _query: {
     path: {
       segments: string[]
+      canonicalString(): string
     }
     explicitOrderBy: { dir: string; field: { segments: string[] } }[]
     filters: FirestoreFilter[]
@@ -128,7 +129,7 @@ function isSingleFilter(filter: FirestoreFilter): filter is SingleFilter {
  * Returns a unique string representation of any scalar data type that Firestore
  * supports.
  */
-function serialize(value: Serializable) {
+function serialize(value: Serializable): string {
   if (value === "NULL_VALUE") return "null"
 
   if (typeof value === "string") {
@@ -144,9 +145,69 @@ function serialize(value: Serializable) {
     return String(value)
   }
 
+  if (isValuesObject(value)) {
+    return value.values.map(serializeValue).join(",")
+  }
+
   throw new Error(
     `use-firestore doesn't know how to serialize ${JSON.stringify(value)}`
   )
 }
 
-type Serializable = string | number | null | undefined | boolean
+type ValueObject = {
+  stringValue?: string
+  integerValue?: string
+  booleanValue?: boolean
+  nullValue?: "NULL_VALUE"
+  doubleValue?: number
+  referenceValue?: string
+}
+
+const VALUE_OBJECT_KEYS = [
+  "stringValue",
+  "integerValue",
+  "booleanValue",
+  "nullValue",
+  "doubleValue",
+  "referenceValue",
+]
+
+function isValueObject(object: Record<string, unknown>): object is ValueObject {
+  return VALUE_OBJECT_KEYS.some((key) =>
+    Object.prototype.hasOwnProperty.call(object, key)
+  )
+}
+
+type ValuesObject = {
+  values: ValueObject[]
+}
+
+function isValuesObject(value: Serializable): value is ValuesObject {
+  if (typeof value !== "object") return false
+
+  const values = (value as ValuesObject).values
+
+  return values.every(isValueObject)
+}
+
+function serializeValue(value: ValueObject) {
+  if (typeof value.booleanValue === "boolean") {
+    return String(value.booleanValue)
+  } else if (typeof value.stringValue === "string") {
+    return serialize(value.stringValue)
+  } else if (typeof value.integerValue === "string") {
+    return value.integerValue
+  } else if (typeof value.nullValue === "string") {
+    return serialize(value.nullValue)
+  } else if (typeof value.doubleValue === "number") {
+    return serialize(value.doubleValue)
+  } else if (typeof value.referenceValue === "string") {
+    return value.referenceValue
+  } else {
+    throw new Error(
+      `use-firestore can't serialize value object ${JSON.stringify(value)}`
+    )
+  }
+}
+
+type Serializable = string | number | null | undefined | boolean | ValuesObject
