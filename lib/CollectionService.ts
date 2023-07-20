@@ -14,7 +14,7 @@ function red(text: string) {
 type CollectionSubscription = {
   hookId: string
   collection: CollectionReference
-  onDocs(docs: CachedDocument[]): void
+  onDocs(docs: CachedDocument[] | undefined): void
 }
 
 /**
@@ -54,6 +54,7 @@ export class CollectionService {
     ids: string[],
     onDocs: (docs: CachedDocument[]) => void
   ) {
+    this.log("registering", hookId)
     // First we make sure some data structures are present for this collection
     let collectionSubscriptions =
       this.subscriptionsByCollectionPath[collection.path]
@@ -87,8 +88,6 @@ export class CollectionService {
      * listeners to this path.
      */
     const subscribe = () => {
-      this.log("doc hook", hookId, "subscribing to", collection.path)
-
       const allIds = new Set<string>()
 
       for (const subscription of collectionSubscriptions) {
@@ -99,9 +98,12 @@ export class CollectionService {
 
       const q = query(collection, where(documentId(), "in", [...allIds]))
 
+      this.log("subscribing to collection", serializeQuery(q))
+
       const unsubscribeFromSnapshots = onSnapshot(q, (querySnapshot) => {
         const dirtyIds: string[] = []
 
+        this.log(collection.path, "snapshot with", querySnapshot.size, "docs")
         for (const change of querySnapshot.docChanges()) {
           switch (change.type) {
             case "added": // We get "added" changes in the very first snapshot
@@ -139,7 +141,11 @@ export class CollectionService {
             (id) => docsCache[id]
           )
 
-          subscription.onDocs(docs)
+          if (docs.some((doc) => doc === undefined)) {
+            subscription.onDocs(undefined)
+          } else {
+            subscription.onDocs(docs)
+          }
         }
       })
 
@@ -197,7 +203,8 @@ export class CollectionService {
     }
 
     if (!this.unsubscribeFunctionsByCollectionPath[collection.path]) {
-      subscribe()
+      this.unsubscribeFunctionsByCollectionPath[collection.path] = noop
+      setTimeout(subscribe)
     }
 
     const docs = this.docIdsByHookId[subscription.hookId].map(
@@ -212,4 +219,8 @@ export class CollectionService {
   updateHookIds(hookId: string, ids: string[]) {
     this.docIdsByHookId[hookId] = ids
   }
+}
+
+function noop() {
+  return
 }

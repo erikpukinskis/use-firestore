@@ -71,7 +71,22 @@ function serializeFilter(filter: SingleFilter) {
     value,
   } = filter
 
-  return `${segments.join("/")}+${op}+${serialize(Object.values(value)[0])}`
+  return `${segments.join("/")}${SERIALIZED_OPS[op]}${serialize(
+    Object.values(value)[0]
+  )}`
+}
+
+const SERIALIZED_OPS = {
+  "<": "<",
+  "<=": "<=",
+  "==": "==",
+  ">": ">",
+  ">=": ">=",
+  "!=": "!=",
+  "array-contains": ".array-contains:",
+  "array-contains-any": ".array-contains-any:",
+  "in": ".in:",
+  "not-in": ".not-in:",
 }
 
 /**
@@ -112,13 +127,13 @@ type FirestoreFilter = SingleFilter | CompoundFilter
 
 type SingleFilter = {
   field: { segments: string[] }
-  op: string
+  op: keyof typeof SERIALIZED_OPS
   value: Record<string, Serializable>
 }
 
 type CompoundFilter = {
   filters: Array<SingleFilter>
-  op: string
+  op: keyof typeof SERIALIZED_OPS
 }
 
 function isSingleFilter(filter: FirestoreFilter): filter is SingleFilter {

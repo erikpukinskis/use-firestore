@@ -17,7 +17,7 @@ function isDocumentReference(
 function isCollectionReference(
   context: Query | DocumentReference | CollectionReference
 ): context is CollectionReference {
-  return context.type === "document"
+  return context.type === "collection"
 }
 
 /**

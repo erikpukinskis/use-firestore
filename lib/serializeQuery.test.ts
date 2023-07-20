@@ -19,7 +19,7 @@ describe("serializeQuery", () => {
       )
     )
 
-    expect(serialized).toEqual(`repos?filter=propertyX+in+"a",1,1.5,true,null`)
+    expect(serialized).toEqual(`repos?filter=propertyX.in:"a",1,1.5,true,null`)
   })
 
   it("serializes multiple constraints", () => {
@@ -32,7 +32,7 @@ describe("serializeQuery", () => {
     )
 
     expect(serialized).toEqual(
-      `stories?filter=ownerUid+==+"abc123"&filter=projectId+==+"xyz"`
+      `stories?filter=ownerUid=="abc123"&filter=projectId=="xyz"`
     )
   })
 
@@ -57,7 +57,7 @@ describe("serializeQuery", () => {
     )
 
     expect(serialized).toEqual(
-      `repos?filter=__name__+in+projects/use-firestore-test/databases/(default)/documents/repos/abc123`
+      `repos?filter=__name__.in:projects/use-firestore-test/databases/(default)/documents/repos/abc123`
     )
   })
 })

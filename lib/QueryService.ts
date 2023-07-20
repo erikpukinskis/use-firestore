@@ -46,10 +46,12 @@ export class QueryService {
 
   registerQueryHook(
     hookId: string,
-    query: Query<DocumentData>,
+    q: Query<DocumentData>,
     onDocs: (docs: CachedDocument[]) => void
   ) {
-    const queryKey = serializeQuery(query)
+    this.log("registering", hookId)
+
+    const queryKey = serializeQuery(q)
 
     // First we make sure these arrays are present for this path
     let queryListeners = this.queryListenersByKey[queryKey]
@@ -88,8 +90,12 @@ export class QueryService {
      * If no one else is subscribed to this query yet, we'll do it
      */
     const subscribe = () => {
-      const unsubscribeFromQuery = onSnapshot(query, (querySnapshot) => {
+      this.log("subscribing to query", queryKey)
+
+      const unsubscribeFromQuery = onSnapshot(q, (querySnapshot) => {
         const docs: CachedDocument[] = []
+
+        this.log(queryKey, "snapshot with", querySnapshot.size, "docs")
 
         querySnapshot.forEach((docSnapshot) => {
           const path = docSnapshot.ref.path
