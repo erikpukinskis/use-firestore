@@ -21,7 +21,7 @@ import {
 import { DocsProvider } from "./DocsProvider"
 import { connectToEmulators, testApp } from "./test/helpers/connectToEmulators"
 import { mockSubscriptions } from "./test/helpers/mockSubscriptions"
-import { useDoc, useDocs } from "./useDoc"
+import { useDoc, useDocs } from "./useDocs"
 import { useQuery } from "./useQuery"
 import type { Repo, Tag } from "~/test/helpers/factory"
 import { setUpRepo, setUpTag } from "~/test/helpers/factory"
@@ -35,7 +35,7 @@ vi.mock("firebase/firestore", async (importOriginal) => {
   }
 })
 
-describe("useDoc", () => {
+describe("useDocs", () => {
   connectToEmulators(beforeAll, afterAll)
 
   afterAll(() => {
