@@ -328,11 +328,12 @@ In this scenario, we get a few nice performance benefits:
 
 Additionally, if we were to use that `tags` array as a prop to a memoized component, it would only trigger a re-render when the collection actually changes, regardless of how many times the parent component renders.
 
-## Todo
+### Todo
 
 - [x] Unsubscribe from query when no more listeners are left
 - [x] Add tests
 - [x] useDoc()
 - [x] useDocs()
-- [ ] deleteDocs
+- [x] deleteDocs
 - [ ] For small collections, just query the entire thing instead of just getting a subset
+- [ ] Add post-processing/validation/type guard function to everything
