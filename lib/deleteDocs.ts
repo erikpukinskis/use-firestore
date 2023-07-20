@@ -1,6 +1,5 @@
 import type { CollectionReference, WriteBatch } from "firebase/firestore"
 import { getDocs, query, where, writeBatch, doc } from "firebase/firestore"
-import { serializeQuery } from "./serializeQuery"
 
 type Association = {
   __type: "remove-from-ids" | "delete-associated-docs"

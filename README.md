@@ -8,11 +8,16 @@ data at the component level.
 **Table of Contents**
 
 - [What it does](#what-it-does)
-- [Example code](#example-code)
+- [Alternatives](#alternatives)
+- [API Reference](#api-reference)
+  - [`useQuery` hook](#usequery-hook)
+  - [`useDoc` hook with optimistic updates](#usedoc-hook-with-optimistic-updates)
+  - [`useDocs` hook](#usedocs-hook)
+  - [`deleteDocs` function](#deletedocs-function)
 - [Why](#why)
 - [Todo](#todo)
 
-### What it does
+## What it does
 
 It does this by caching results on a per-query basis, such that you can call
 the same hook with the same query 50 times on the same page, and
@@ -208,6 +213,53 @@ return (
 )
 ```
 
+### `deleteDocs` function
+
+Basic deletion:
+
+```ts
+import { deleteDocs } from "use-firestore"
+import { collection, getFirestore } from "firebase/firestore"
+
+await deleteDocs(collection(getFirestore(app), "tags"), [
+  "tag123",
+  "tag456",
+  "tag789",
+])
+```
+
+Also remove the deleted doc's `id` from the `tagIds` field on an associated collection:
+
+```ts
+import { deleteDocs, andRemoveFromIds } from "use-firestore"
+
+await deleteDocs(
+  collection(getFirestore(app), "tags"),
+  ["tag123"],
+  andRemoveFromIds(collection(getFirestore(app), "repos"), "tagIds")
+)
+```
+
+Delete related docs with a 1:1 or 1:N relation:
+
+```ts
+import { deleteDocs, andDeleteAssociatedDocs } from "use-firestore"
+
+await deleteDocs(
+  collection(getFirestore(app), "tags"),
+  ["tag123"],
+  andDeleteAssociatedDocs(collection(getFirestore(app), "highlights"), "tagId")
+)
+```
+
+The above code will also delete any documents in the "highlights" collection which have the `tagId` field set to `"tag123"`, before deleting `/tags/tag123`.
+
+**Warnings**:
+
+The `deleteDocs` function will do all of the deletions and updates in a series of [batched writes](https://firebase.google.com/docs/firestore/manage-data/transactions#batched-writes). However note that if there are more than 500 updates and/or writes to do, `deleteDocs` will do several batched writes. If any batch fails this can create inconsistencies in your data.
+
+In addition, as part of its execution `deleteDocs` has to query the relations it will delete/update. If the underlying data is modified between when it does those queries and when the batches are committed, this can also introduce inconsistencies.
+
 ## Why
 
 Applications can be built a lot more simply when individual components can request the data they need, without having to worry about triggering the N+1 problem.
@@ -276,7 +328,7 @@ In this scenario, we get a few nice performance benefits:
 
 Additionally, if we were to use that `tags` array as a prop to a memoized component, it would only trigger a re-render when the collection actually changes, regardless of how many times the parent component renders.
 
-### Todo
+## Todo
 
 - [x] Unsubscribe from query when no more listeners are left
 - [x] Add tests

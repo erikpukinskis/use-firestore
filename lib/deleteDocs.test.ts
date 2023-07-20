@@ -1,20 +1,11 @@
 import { waitFor } from "@testing-library/react"
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  getFirestore,
-  query,
-  where,
-} from "firebase/firestore"
+import { collection, doc, getDoc, getFirestore } from "firebase/firestore"
 import { describe, it, expect, beforeAll, afterAll } from "vitest"
 import {
   andDeleteAssociatedDocs,
   andRemoveFromIds,
   deleteDocs,
 } from "./deleteDocs"
-import { serializeQuery } from "./serializeQuery"
 import {
   connectToEmulators,
   setUpHighlight,
