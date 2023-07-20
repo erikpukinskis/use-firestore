@@ -195,9 +195,7 @@ export class QueryService {
       )
 
       if (index < 0) {
-        throw new Error(
-          `Take-ownership-function for hook ${hookId} was already gone before unlisten() was called`
-        )
+        return
       }
 
       assignQueryOwnerFunctions.splice(index, 1)
