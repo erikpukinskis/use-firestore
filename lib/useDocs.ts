@@ -1,21 +1,19 @@
-import type { DocumentData, Query } from "firebase/firestore"
-import { onSnapshot } from "firebase/firestore"
-import { useEffect, useState } from "react"
-
-type Listener<T extends object> = (docs: Array<T>) => void
-
-const docsArraysByKey: Record<string, Array<object>> = {}
-const unsubscribeByKey: Record<string, () => void> = {}
-const listenersByKey: Record<string, Listener<object>[]> = {}
+import type {
+  CollectionReference,
+  DocumentData,
+  DocumentReference,
+} from "firebase/firestore"
+import { collection, updateDoc } from "firebase/firestore"
+import { useEffect, useRef, useState } from "react"
+import { useCollectionService } from "./DocsProvider"
+import { useHookId } from "./useHookId"
 
 /**
- * Returns and caches the results of a Firestore query, such that you can call
- * the same hook with the same query 50 times on the same page, and
- * `use-firestore` will only create one single subscription, and will return the
- * exact same object or array of objects to all 50 of those hooks.
+ * Returns and caches the results of a Firestore single document query. Also
+ * provides an `update` function.
  *
- * The `query` object doesn't need to be the same for this to work, as long as
- * its the same path, filters, and conditions it will produce a cache hit.
+ * If the document has already been queried as part of a collection, it will not
+ * be
  *
  * The returned documents will be normal JavaScript objects like:
  *
@@ -28,216 +26,81 @@ const listenersByKey: Record<string, Listener<object>[]> = {}
  *
  * You can provide a type assertion as well:
  *
- *       const users = useDocs<Users>(query)
+ *       const users = useQuery<Users>(query)
  *
  * A subscription to Firestore will be created for each unique query, and the
  * results of the hook will be updated in realtime.
+ *
+ * @returns a `[doc, updateDoc]` tuple, similar to what `useState` returns.
  */
-export function useDocs<T extends object>(query: Query<DocumentData>) {
-  const key = serializeQuery(query)
+export function useDoc<T extends { id: string }>(ref: DocumentReference) {
+  const [doc, setDoc] = useState<T | undefined>()
+  const hookId = useHookId(ref)
+  const service = useCollectionService("useDoc")
 
-  const [docs, setDocs] = useState(docsArraysByKey[key] as Array<T> | undefined)
+  const path = ref.path
 
   useEffect(() => {
-    let listeners = listenersByKey[key]
-
-    if (!listeners) {
-      listeners = []
-      listenersByKey[key] = listeners
-
-      const unsubscribe = onSnapshot(query, (snapshot) => {
-        const docs: T[] = []
-
-        snapshot.forEach((doc) => {
-          docs.push({ id: doc.id, ...doc.data() } as T)
-        })
-
-        docsArraysByKey[key] = docs
-
-        for (const listener of listenersByKey[key]) {
-          listener(docs)
-        }
-      })
-
-      unsubscribeByKey[key] = unsubscribe
-    }
-
-    const listener: Listener<object> = (docs) => {
-      setDocs(docs as Array<T>)
-    }
-
-    listeners.push(listener)
-
-    return function cleanup() {
-      const index = listeners.indexOf(listener)
-      listeners.splice(index, 1)
-
-      if (listeners.length === 0) {
-        setTimeout(() => {
-          if (listeners.length > 0) return
-
-          const unsubscribe = unsubscribeByKey[key]
-
-          if (!unsubscribe) return
-
-          delete unsubscribeByKey[key]
-
-          unsubscribe()
-        }, 100)
+    const { unregister, cachedDocs } = service.registerDocsHook(
+      hookId,
+      collection(ref.firestore, ref.parent.path),
+      [ref.id],
+      ([doc]) => {
+        setDoc(doc as unknown as T)
       }
+    )
+
+    if (cachedDocs) setDoc(cachedDocs[0] as unknown as T)
+
+    return unregister
+  }, [path])
+
+  async function update(updates: Partial<T>) {
+    setDoc((doc) => {
+      if (!doc) {
+        throw new Error("Cannot update doc before it has been loaded")
+      }
+
+      return { ...doc, ...updates }
+    })
+
+    await updateDoc(ref, updates as DocumentData)
+  }
+
+  return [doc, update] as const
+}
+
+export function useDocs<T extends { id: string }>(
+  collection: CollectionReference,
+  ids: string[]
+) {
+  const [docs, setDocs] = useState<T[] | undefined>()
+  const hookId = useHookId(collection, ids)
+  const service = useCollectionService("useDoc")
+  const firstRenderRef = useRef(true)
+
+  useEffect(() => {
+    const { unregister, cachedDocs } = service.registerDocsHook(
+      hookId,
+      collection,
+      ids,
+      (docs) => {
+        setDocs(docs as unknown as T[])
+      }
+    )
+
+    if (cachedDocs) setDocs(cachedDocs as unknown as T[])
+
+    return unregister
+  }, [collection.path])
+
+  useEffect(() => {
+    if (firstRenderRef.current) {
+      firstRenderRef.current = false
+      return
     }
-  }, [setDocs])
+    service.updateHookIds(collection.path, hookId, ids)
+  }, [ids.join()])
 
   return docs
 }
-
-/**
- * Returns a unique string for a Firestore query.
- *
- * The string will be querystring-like, although not URL encoded. For example, given the following query:
- *
- *           query(
- *             collection(getFirestore(app), "stories"),
- *             where("ownerUid", "==", "abc123"),
- *             where("projectId", "==", "xyz")
- *           )
- *
- * `serializeQuery` will return:
- *
- *           "path=stories&filters=ownerUid==abc123,projectId==xyz"
- */
-function serializeQuery(query: Query<DocumentData>) {
-  const { _query } = query as Firestore3Query
-
-  try {
-    const path = _query.path.segments.join("/")
-
-    const orders = _query.explicitOrderBy
-      .map(({ dir, field: { segments } }) => `${dir}-${segments.join("/")}`)
-      .join(",")
-
-    const filters = _query.filters
-      .map((filter) => {
-        if (isSingleFilter(filter)) {
-          return serializeFilter(filter)
-        } else {
-          return serializeCompoundFilter(filter)
-        }
-      })
-      .join(" && ")
-
-    const { limit, limitType, startAt, endAt } = _query
-
-    const parameters = [`path=${path}`]
-
-    if (orders.length) parameters.push(`orders=${orders}`)
-    if (filters.length) parameters.push(`filters=${filters}`)
-    if (limit != null)
-      parameters.push(
-        `limit=${serialize(limit)}`,
-        `limitType=${serialize(limitType)}`
-      )
-    if (startAt != null) parameters.push(`startAt=${serialize(startAt)}`)
-    if (endAt != null) parameters.push(`endAt=${serialize(endAt)}`)
-
-    return parameters.join("&")
-  } catch (e) {
-    console.error(
-      `Error serializing query:\n${JSON.stringify(_query, null, 4)}`
-    )
-
-    throw e
-  }
-}
-
-/**
- * Serialize a single Firebase filter. Returns something like:
- *
- *       "ownerUid==abc123"
- */
-function serializeFilter(filter: SingleFilter) {
-  const {
-    field: { segments },
-    op,
-    value,
-  } = filter
-
-  return `${segments.join("/")}${op}${serialize(Object.values(value)[0])}`
-}
-
-/**
- * Serialize a compound Firebase filter. Returns something like:
- *
- *       "AND(filters=ownerUid==abc123,projectId==xyz)"
- */
-function serializeCompoundFilter(filter: CompoundFilter) {
-  return `${filter.op.toUpperCase()}(${filter.filters
-    .map(serializeFilter)
-    .join(`,`)})`
-}
-
-/**
- * Data type representing the private `_query` property of a Firestore
- * `Query<DocumentData>` object. This is likely to change and break things with
- * new versions of Firestore.
- */
-type Firestore3Query = Query<DocumentData> & {
-  _query: {
-    path: {
-      segments: string[]
-    }
-    explicitOrderBy: { dir: string; field: { segments: string[] } }[]
-    filters: FirestoreFilter[]
-    limit: number | null
-    startAt: Serializable
-    endAt: Serializable
-    limitType: Serializable
-  }
-}
-
-/**
- * Type representing the various filter objects in a Firebase query object
- */
-type FirestoreFilter = SingleFilter | CompoundFilter
-
-type SingleFilter = {
-  field: { segments: string[] }
-  op: string
-  value: Record<string, Serializable>
-}
-
-type CompoundFilter = {
-  filters: Array<SingleFilter>
-  op: string
-}
-
-function isSingleFilter(filter: FirestoreFilter): filter is SingleFilter {
-  return Object.prototype.hasOwnProperty.call(filter, "field")
-}
-
-/**
- * Returns a unique string representation of any scalar data type that Firestore
- * supports.
- */
-function serialize(value: Serializable) {
-  if (value === "NULL_VALUE") return "null"
-
-  if (typeof value === "string") {
-    return `"${value.replace('"', '"')}"`
-  }
-
-  if (
-    typeof value === "number" ||
-    value === null ||
-    value === undefined ||
-    typeof value === "boolean"
-  ) {
-    return String(value)
-  }
-
-  throw new Error(
-    `use-firestore doesn't know how to serialize ${JSON.stringify(value)}`
-  )
-}
-
-type Serializable = string | number | null | undefined | boolean
