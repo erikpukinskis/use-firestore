@@ -233,7 +233,7 @@ export class CollectionService {
       unsubscribeFromSnapshots
   }
 
-  updateHookIds(collectionPath: string, hookId: string, ids: string[]) {
+  updateDocIds(collectionPath: string, hookId: string, ids: string[]) {
     this.docIdsByHookId[hookId] = ids
 
     const subscribedIds = this.subscribedIdsByPath[collectionPath]

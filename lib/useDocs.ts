@@ -38,9 +38,8 @@ export function useDoc<T extends { id: string }>(ref: DocumentReference) {
   const hookId = useHookId(ref)
   const service = useCollectionService("useDoc")
 
-  const path = ref.path
-
   useEffect(() => {
+    setDoc(undefined)
     const { unregister, cachedDocs } = service.registerDocsHook(
       hookId,
       collection(ref.firestore, ref.parent.path),
@@ -53,7 +52,12 @@ export function useDoc<T extends { id: string }>(ref: DocumentReference) {
     if (cachedDocs) setDoc(cachedDocs[0] as unknown as T)
 
     return unregister
-  }, [path])
+  }, [ref.parent.path])
+
+  useEffect(() => {
+    setDoc(undefined)
+    service.updateDocIds(ref.parent.path, hookId, [ref.id])
+  }, [ref.parent.path, ref.id])
 
   async function update(updates: Partial<T>) {
     setDoc((doc) => {
@@ -80,6 +84,7 @@ export function useDocs<T extends { id: string }>(
   const firstRenderRef = useRef(true)
 
   useEffect(() => {
+    setDocs(undefined)
     const { unregister, cachedDocs } = service.registerDocsHook(
       hookId,
       collection,
@@ -95,11 +100,13 @@ export function useDocs<T extends { id: string }>(
   }, [collection.path])
 
   useEffect(() => {
+    setDocs(undefined)
+
     if (firstRenderRef.current) {
       firstRenderRef.current = false
       return
     }
-    service.updateHookIds(collection.path, hookId, ids)
+    service.updateDocIds(collection.path, hookId, ids)
   }, [ids.join()])
 
   return docs
