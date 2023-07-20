@@ -42,6 +42,68 @@ const users = useQuery<Users>(query)
 A subscription to Firestore will be created for each unique query, and the
 results of the hook will be updated in realtime.
 
+Lastly, `use-firestore` provides `useDocs` hook which batches collection subscriptions globally, which allows you to fetch associated documents deep in your React Component tree without triggering the N+1 problem.
+
+For example, if you wanted to query a collection, and then grab associated tags off each document in the result set, this would only require two subscriptions to your Firestore database:
+
+```tsx
+function ListRepos({ ownerId }: ListReposProps) {
+  const repos = useQuery<Repo>(
+    query(
+      collection(getFirestore(testApp), "repos"),
+      where("ownerId", "==", ownerId)
+    )
+  )
+
+  if (!repos) return null
+
+  return (
+    <>
+      {repos.map(({ id, slug, tagIds }) => (
+        <Repo key={id} slug={slug} tagIds={tagIds} />
+      ))}
+    </>
+  )
+}
+
+function Repo({ slug, tagIds }: { slug: string; tagIds: string[] }) {
+  const tags = useDocs<Tag>(collection(getFirestore(testApp), "tags"), tagIds)
+
+  if (!tags) return null
+
+  return (
+    <li>
+      {slug}
+      {tags.map((tag) => (
+        <span key={tag.id} className={`tag-${tag.color}`}>
+          {tag.text}
+        </span>
+      ))}
+    </li>
+  )
+}
+```
+
+## Alternatives
+
+For an alternative approach, check out @chrisbianca's [react-firebase-hooks](https://www.npmjs.com/package/react-firebase-hooks). It's an awesome package that I've used in many projects and Chris is a fantastic developer and maintainer. `react-firebase-hooks` is oriented more towards the "denomalized" architecture used in many Firestore projects, where you copy associated data onto your documents so you can doa single query and get all the data you need.
+
+If you want to take this "denormalized" approach check out the [integrify](https://www.npmjs.com/package/integrify) package which lets you declaratively set up relations between your collections. It automatically maintains Firestore triggers that the synchronize the data between those collections.
+
+`use-firestore` takes a different approach. It encourages you do keep your data normalized, so there's a single source of truth. And then it helps you efficiently aggregate the queries needed to support your relations within a React app.
+
+|                                                  | use-firestore | react-firebase-hooks                |
+| ------------------------------------------------ | ------------- | ----------------------------------- |
+| React-based                                      | ✅            | ✅                                  |
+| Realtime updates                                 | ✅            | ✅                                  |
+| Re-use queries application-wide                  | ✅            | ❌                                  |
+| Throws errors                                    | ✅            | ❌ requires manual error handling   |
+| Memory efficient derived state on top of queries | ✅            | ❌ each hook returns unique objects |
+| Optimistic updates                               | ✅            | ❌                                  |
+| Batch document reads to avoid N+1 problem        | ✅            | ❌                                  |
+
+## API Reference
+
 ### `useQuery` hook
 
 ```tsx
@@ -95,7 +157,9 @@ const users = useGlobalMemo("users", () => userDocs.map((user)) => ({
 }), [userDocs, assignmentsById])
 ```
 
-### `useDoc` hook
+### `useDoc` hook with optimistic updates
+
+The `useDoc` hook returns both the document and an update function that immediately updates the document state while firing off a write to Firestore in the background:
 
 ```tsx
 import { useDoc } from "use-firestore"
@@ -106,6 +170,8 @@ function Repo({ repoId }) {
   const [repo, updateRepo] = useDoc<Repo>(
     doc(getFirestore(testApp), "repos", repoId)
   )
+
+  if (!repo) return null
 
   return (
     <input
@@ -121,7 +187,28 @@ function Repo({ repoId }) {
 }
 ```
 
-### Why
+### `useDocs` hook
+
+```tsx
+import { useDocs } from "use-firestore"
+import { collection, getFirestore } from "firebase/firestore"
+
+const tags = useDocs<Tag>(collection(getFirestore(app), "tags"), tagIds)
+
+if (!tags) return null
+
+return (
+  <>
+    {tags.map((tag) => (
+      <span key={tag.id} className={`tag-${tag.color}`}>
+        {tag.text}
+      </span>
+    ))}
+  </>
+)
+```
+
+## Why
 
 Applications can be built a lot more simply when individual components can request the data they need, without having to worry about triggering the N+1 problem.
 
@@ -193,6 +280,7 @@ Additionally, if we were to use that `tags` array as a prop to a memoized compon
 
 - [x] Unsubscribe from query when no more listeners are left
 - [x] Add tests
-- [ ] useQuery() with smart caching
-- [ ] useCascadingDelete()
+- [x] useDoc()
+- [x] useDocs()
+- [ ] deleteDocs
 - [ ] For small collections, just query the entire thing instead of just getting a subset
