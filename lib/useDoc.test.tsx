@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react"
+import { cleanup, render, waitFor } from "@testing-library/react"
 import { renderHook } from "@testing-library/react-hooks"
 import {
   collection,
@@ -9,7 +9,6 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore"
-import React, { useState } from "react"
 import {
   describe,
   it,
@@ -20,7 +19,6 @@ import {
   beforeEach,
 } from "vitest"
 import { DocsProvider } from "./DocsProvider"
-import { UNSUBSCRIBE_DELAY } from "./QueryService"
 import { connectToEmulators, testApp } from "./test/helpers/connectToEmulators"
 import { mockSubscriptions } from "./test/helpers/mockSubscriptions"
 import { useDoc, useDocs } from "./useDoc"
@@ -147,11 +145,11 @@ describe("useDoc", () => {
     const { tag: tag2 } = await setUpTag(testApp)
 
     const { repo: repo1 } = await setUpRepo(testApp, { tagIds: [tag1.id] })
-    const { repo: repo2 } = await setUpRepo(testApp, {
+    await setUpRepo(testApp, {
       ownerId: repo1.ownerId,
       tagIds: [tag2.id],
     })
-    const { repo: repo3 } = await setUpRepo(testApp, {
+    await setUpRepo(testApp, {
       ownerId: repo1.ownerId,
       tagIds: [tag1.id, tag2.id],
     })
@@ -165,6 +163,34 @@ describe("useDoc", () => {
     await waitFor(() => expect(getAllByRole("listitem")).toHaveLength(3))
 
     expect(onSnapshot).toHaveBeenCalledTimes(2)
+  })
+
+  it("re-subscribes a collection when we add new ids", async () => {
+    const { tag: tag1 } = await setUpTag(testApp, { text: "one" })
+    const { tag: tag2 } = await setUpTag(testApp, { text: "two" })
+
+    const { repo } = await setUpRepo(testApp, { tagIds: [tag1.id] })
+
+    const { onSnapshot } = mockSubscriptions()
+
+    const { getAllByRole, getByText } = render(
+      <ListRepos ownerId={repo.ownerId} />,
+      {
+        wrapper: DocsProvider,
+      }
+    )
+
+    await waitFor(() => expect(getAllByRole("listitem")).toHaveLength(1))
+
+    expect(onSnapshot).toHaveBeenCalledTimes(2)
+
+    await updateDoc(doc(getFirestore(testApp), "repos", repo.id), {
+      tagIds: [tag1.id, tag2.id],
+    })
+
+    await waitFor(() => getByText("two"))
+
+    expect(onSnapshot).toHaveBeenCalledTimes(3)
   })
 })
 

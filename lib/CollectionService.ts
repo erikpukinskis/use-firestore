@@ -5,6 +5,13 @@ import { serializeQuery } from "./serializeQuery"
 
 type CachedDocument = DocumentData & { id: string }
 
+// type CollectionState =
+//   | "offline"
+//   | "waiting-to-subscribe"
+//   | "waiting-for-snapshot"
+//   | "up-to-date"
+//   | "waiting-to-re-subscribe"
+
 export const UNSUBSCRIBE_DELAY = 100
 
 function red(text: string) {
@@ -38,6 +45,8 @@ export class CollectionService {
   subscriptionsByCollectionPath: Record<string, CollectionSubscription[]> = {}
   docsCacheByCollectionPath: Record<string, Record<string, CachedDocument>> = {}
   docIdsByHookId: Record<string, string[]> = {}
+  subscribedIdsByPath: Record<string, string[]> = {}
+  collectionReferencesByPath: Record<string, CollectionReference> = {}
 
   constructor(debug: boolean) {
     this.debug = debug
@@ -54,6 +63,8 @@ export class CollectionService {
     ids: string[],
     onDocs: (docs: CachedDocument[]) => void
   ) {
+    this.collectionReferencesByPath[collection.path] = collection
+
     this.log("registering", hookId)
     // First we make sure some data structures are present for this collection
     let collectionSubscriptions =
@@ -82,76 +93,6 @@ export class CollectionService {
     collectionSubscriptions.push(subscription)
 
     this.docIdsByHookId[hookId] = ids
-
-    /**
-     * Subscribe to updates from this document and provide them to any and all
-     * listeners to this path.
-     */
-    const subscribe = () => {
-      const allIds = new Set<string>()
-
-      for (const subscription of collectionSubscriptions) {
-        for (const id of this.docIdsByHookId[subscription.hookId]) {
-          allIds.add(id)
-        }
-      }
-
-      const q = query(collection, where(documentId(), "in", [...allIds]))
-
-      this.log("subscribing to collection", serializeQuery(q))
-
-      const unsubscribeFromSnapshots = onSnapshot(q, (querySnapshot) => {
-        const dirtyIds: string[] = []
-
-        this.log(collection.path, "snapshot with", querySnapshot.size, "docs")
-        for (const change of querySnapshot.docChanges()) {
-          switch (change.type) {
-            case "added": // We get "added" changes in the very first snapshot
-            case "modified": {
-              const doc: CachedDocument = {
-                id: change.doc.id,
-                ...change.doc.data(),
-              }
-
-              docsCache[change.doc.id] = doc
-
-              dirtyIds.push(change.doc.id)
-              break
-            }
-            case "removed": {
-              // Means a doc got deleted. Probably need to send an undefined
-              // if any docs are deleted
-              delete docsCache[change.doc.id]
-              break
-            }
-          }
-        }
-
-        for (const subscription of collectionSubscriptions) {
-          const dirtyIdsForHook = intersect([
-            dirtyIds,
-            this.docIdsByHookId[subscription.hookId],
-          ])
-
-          if (dirtyIdsForHook.length === 0) {
-            continue
-          }
-
-          const docs = this.docIdsByHookId[subscription.hookId].map(
-            (id) => docsCache[id]
-          )
-
-          if (docs.some((doc) => doc === undefined)) {
-            subscription.onDocs(undefined)
-          } else {
-            subscription.onDocs(docs)
-          }
-        }
-      })
-
-      this.unsubscribeFunctionsByCollectionPath[collection.path] =
-        unsubscribeFromSnapshots
-    }
 
     /**
      * Give up ownership of the path, and pass on ownership to another hook if
@@ -204,7 +145,7 @@ export class CollectionService {
 
     if (!this.unsubscribeFunctionsByCollectionPath[collection.path]) {
       this.unsubscribeFunctionsByCollectionPath[collection.path] = noop
-      setTimeout(subscribe)
+      setTimeout(() => this.subscribe(collection.path))
     }
 
     const docs = this.docIdsByHookId[subscription.hookId].map(
@@ -216,8 +157,103 @@ export class CollectionService {
     return { unregister, cachedDocs: hookIsFullyCached ? docs : undefined }
   }
 
-  updateHookIds(hookId: string, ids: string[]) {
+  subscribe(collectionPath: string) {
+    const allIds = new Set<string>()
+
+    const collectionSubscriptions =
+      this.subscriptionsByCollectionPath[collectionPath]
+
+    const docsCache = this.docsCacheByCollectionPath[collectionPath]
+
+    for (const subscription of collectionSubscriptions) {
+      for (const id of this.docIdsByHookId[subscription.hookId]) {
+        allIds.add(id)
+      }
+    }
+
+    this.subscribedIdsByPath[collectionPath] = [...allIds]
+
+    const q = query(
+      this.collectionReferencesByPath[collectionPath],
+      where(documentId(), "in", this.subscribedIdsByPath[collectionPath])
+    )
+
+    this.log("subscribing to collection", serializeQuery(q))
+
+    const unsubscribeFromSnapshots = onSnapshot(q, (querySnapshot) => {
+      const dirtyIds: string[] = []
+
+      this.log(collectionPath, "snapshot with", querySnapshot.size, "docs")
+      for (const change of querySnapshot.docChanges()) {
+        switch (change.type) {
+          case "added": // We get "added" changes in the very first snapshot
+          case "modified": {
+            const doc: CachedDocument = {
+              id: change.doc.id,
+              ...change.doc.data(),
+            }
+
+            docsCache[change.doc.id] = doc
+
+            dirtyIds.push(change.doc.id)
+            break
+          }
+          case "removed": {
+            // Means a doc got deleted. Probably need to send an undefined
+            // if any docs are deleted
+            delete docsCache[change.doc.id]
+            break
+          }
+        }
+      }
+
+      for (const subscription of collectionSubscriptions) {
+        const dirtyIdsForHook = intersect([
+          dirtyIds,
+          this.docIdsByHookId[subscription.hookId],
+        ])
+
+        if (dirtyIdsForHook.length === 0) {
+          continue
+        }
+
+        const docs = this.docIdsByHookId[subscription.hookId].map(
+          (id) => docsCache[id]
+        )
+
+        if (docs.some((doc) => doc === undefined)) {
+          subscription.onDocs(undefined)
+        } else {
+          subscription.onDocs(docs)
+        }
+      }
+    })
+
+    this.unsubscribeFunctionsByCollectionPath[collectionPath] =
+      unsubscribeFromSnapshots
+  }
+
+  updateHookIds(collectionPath: string, hookId: string, ids: string[]) {
     this.docIdsByHookId[hookId] = ids
+
+    const subscribedIds = this.subscribedIdsByPath[collectionPath]
+
+    if (ids.some((id) => !subscribedIds.includes(id))) {
+      this.resubscribe(collectionPath)
+    }
+  }
+
+  resubscribe(collectionPath: string) {
+    const unsubscribe =
+      this.unsubscribeFunctionsByCollectionPath[collectionPath]
+
+    if (!unsubscribe) {
+      throw new Error("Can't resubscribe when we're not already subcribed?")
+    }
+
+    unsubscribe()
+
+    this.subscribe(collectionPath)
   }
 }
 

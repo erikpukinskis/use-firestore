@@ -4,7 +4,7 @@ import type {
   DocumentReference,
 } from "firebase/firestore"
 import { collection, updateDoc } from "firebase/firestore"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useCollectionService } from "./DocsProvider"
 import { useHookId } from "./useHookId"
 
@@ -77,6 +77,7 @@ export function useDocs<T extends { id: string }>(
   const [docs, setDocs] = useState<T[] | undefined>()
   const hookId = useHookId(collection, ids)
   const service = useCollectionService("useDoc")
+  const firstRenderRef = useRef(true)
 
   useEffect(() => {
     const { unregister, cachedDocs } = service.registerDocsHook(
@@ -91,7 +92,15 @@ export function useDocs<T extends { id: string }>(
     if (cachedDocs) setDocs(cachedDocs as unknown as T[])
 
     return unregister
-  }, [collection.path, ...ids])
+  }, [collection.path])
+
+  useEffect(() => {
+    if (firstRenderRef.current) {
+      firstRenderRef.current = false
+      return
+    }
+    service.updateHookIds(collection.path, hookId, ids)
+  }, [ids.join()])
 
   return docs
 }
