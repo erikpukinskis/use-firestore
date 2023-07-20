@@ -193,13 +193,3 @@ describe("useDoc", () => {
     expect(onSnapshot).toHaveBeenCalledTimes(3)
   })
 })
-
-/**
- * Async helper to wait a few milliseconds for the subscriptions to be
- * processed. Ideally we would use vi.useFakeTimers but when I tried that, the
- * tests hung when trying to use the factories. Maybe Firestore doesn't play
- * nicely with vi.useFakeTimers()?
- */
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
