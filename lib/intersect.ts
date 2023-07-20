@@ -24,7 +24,7 @@
  * SOFTWARE.
  */
 
-function default_hash<T>(x: T): any {
+function default_hash<T>(x: T): T {
   return x
 }
 
@@ -53,7 +53,7 @@ export default function intersect<T>(
   }
 
   // Create a map associating each element to its current count
-  const set = new Map()
+  const set = new Map<unknown, number>()
   for (const elem of arrays[0]) {
     set.set(hash(elem), 1)
   }
