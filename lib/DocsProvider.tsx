@@ -52,3 +52,11 @@ export function useCollectionService(hookName: string) {
 
   return context.collectionService
 }
+
+export function useLog() {
+  const context = useContext(DocsContext)
+
+  return (...args: Parameters<typeof console.log>) => {
+    context.queryService.log(...args)
+  }
+}

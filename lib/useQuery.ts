@@ -1,6 +1,6 @@
 import type { DocumentData, Query } from "firebase/firestore"
-import { useEffect, useState } from "react"
-import { useQueryService } from "./DocsProvider"
+import { useEffect, useRef, useState } from "react"
+import { useLog, useQueryService } from "./DocsProvider"
 import { serializeQuery } from "./serializeQuery"
 import { useHookId } from "./useHookId"
 
@@ -33,8 +33,17 @@ export function useQuery<T extends { id: string }>(query: Query<DocumentData>) {
   const [docs, setDocs] = useState<Array<T> | undefined>()
   const hookId = useHookId(query)
   const service = useQueryService("useQuery")
+  const log = useLog()
+
+  const firstRenderRef = useRef(true)
 
   useEffect(() => {
+    if (firstRenderRef.current) {
+      firstRenderRef.current = false
+    } else {
+      log(hookId, "query changed to", serializeQuery(query))
+    }
+
     const { unregister, cachedResults } = service.registerQueryHook(
       hookId,
       query,

@@ -41,7 +41,7 @@ export class QueryService {
 
   log(...args: Parameters<typeof console.log>) {
     if (!this.debug) return
-    console.log(`${red("use-firestore")} |`, ...args)
+    console.log(`${red("use-firestore")} 🔥`, ...args)
   }
 
   registerQueryHook(
@@ -49,9 +49,15 @@ export class QueryService {
     q: Query<DocumentData>,
     onDocs: (docs: CachedDocument[]) => void
   ) {
-    this.log("registering", hookId)
-
     const queryKey = serializeQuery(q)
+
+    const hasOwner = Boolean(this.ownerByQueryKey[queryKey])
+
+    this.log(
+      "registering",
+      hookId,
+      hasOwner ? "⇒ has owner" : "⇒ subscribing..."
+    )
 
     // First we make sure these arrays are present for this path
     let queryListeners = this.queryListenersByKey[queryKey]
@@ -91,6 +97,7 @@ export class QueryService {
      */
     const subscribe = () => {
       this.log("subscribing to query", queryKey)
+      this.ownerByQueryKey[queryKey] = hookId
 
       const unsubscribeFromQuery = onSnapshot(q, (querySnapshot) => {
         const docs: CachedDocument[] = []
@@ -116,7 +123,6 @@ export class QueryService {
       })
 
       this.unsubscribeFunctionsByQueryKey[queryKey] = unsubscribeFromQuery
-      this.ownerByQueryKey[queryKey] = hookId
     }
 
     /**
@@ -195,9 +201,7 @@ export class QueryService {
       )
 
       if (index < 0) {
-        throw new Error(
-          `Take-ownership-function for hook ${hookId} was already gone before unlisten() was called`
-        )
+        return
       }
 
       assignQueryOwnerFunctions.splice(index, 1)
@@ -219,6 +223,11 @@ export class QueryService {
       // If we're the query owner, we will need to unsubscribe so we don't leave
       // lots of connections open.
       if (this.ownerByQueryKey[queryKey] === hookId) {
+        this.log(
+          hookId,
+          "is unregistering and may unsubscribe in",
+          `${UNSUBSCRIBE_DELAY}ms...`
+        )
         // We wait a little bit before unsubscribing, just in case we're
         // navigating or something and we're about to get a new wave of hooks
         // that might want to take over ownership.
@@ -238,7 +247,7 @@ export class QueryService {
 
     // If there's already an owner for this query, we just listen to their
     // results. Otherwise we create a new subscription.
-    if (this.ownerByQueryKey[queryKey]) {
+    if (hasOwner) {
       cachedResults = this.lastQueryResultByKey[queryKey]
       listen()
     } else {

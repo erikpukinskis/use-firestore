@@ -26,6 +26,12 @@ export default defineConfig({
 
     rollupOptions: {
       external: ["firebase/firestore", "react"],
+      output: {
+        globals: {
+          "react": "react",
+          "firebase/firestore": "firestore",
+        },
+      },
     },
   },
 })
