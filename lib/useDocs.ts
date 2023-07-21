@@ -5,7 +5,7 @@ import type {
 } from "firebase/firestore"
 import { collection, updateDoc } from "firebase/firestore"
 import { useEffect, useRef, useState } from "react"
-import { useCollectionService } from "./DocsProvider"
+import { useCollectionService, useLog } from "./DocsProvider"
 import { useHookId } from "./useHookId"
 
 /**
@@ -37,24 +37,46 @@ export function useDoc<T extends { id: string }>(ref: DocumentReference) {
   const [doc, setDoc] = useState<T | undefined>()
   const hookId = useHookId(ref)
   const service = useCollectionService("useDoc")
+  const firstRenderRef = useRef(true)
+  const mountedRef = useRef(true)
+  const log = useLog()
+
+  useEffect(
+    () => () => {
+      mountedRef.current = false
+    },
+    []
+  )
 
   useEffect(() => {
-    setDoc(undefined)
+    if (!firstRenderRef.current) {
+      setDoc(undefined)
+    }
+
     const { unregister, cachedDocs } = service.registerDocsHook(
       hookId,
       collection(ref.firestore, ref.parent.path),
       [ref.id],
       ([doc]) => {
+        if (!mountedRef.current) return
         setDoc(doc as unknown as T)
       }
     )
 
-    if (cachedDocs) setDoc(cachedDocs[0] as unknown as T)
+    if (cachedDocs) {
+      setDoc(cachedDocs[0] as unknown as T)
+    }
 
     return unregister
   }, [ref.parent.path])
 
   useEffect(() => {
+    if (firstRenderRef.current) {
+      firstRenderRef.current = false
+      return
+    }
+
+    log("doc id for", hookId, "changed to", ref.id)
     setDoc(undefined)
     service.updateDocIds(ref.parent.path, hookId, [ref.id])
   }, [ref.parent.path, ref.id])
@@ -82,6 +104,14 @@ export function useDocs<T extends { id: string }>(
   const hookId = useHookId(collection, ids)
   const service = useCollectionService("useDoc")
   const firstRenderRef = useRef(true)
+  const mountedRef = useRef(true)
+
+  useEffect(
+    () => () => {
+      mountedRef.current = false
+    },
+    []
+  )
 
   useEffect(() => {
     setDocs(undefined)
@@ -90,6 +120,7 @@ export function useDocs<T extends { id: string }>(
       collection,
       ids,
       (docs) => {
+        if (!mountedRef.current) return
         setDocs(docs as unknown as T[])
       }
     )
@@ -106,6 +137,7 @@ export function useDocs<T extends { id: string }>(
       firstRenderRef.current = false
       return
     }
+
     service.updateDocIds(collection.path, hookId, ids)
   }, [ids.join()])
 

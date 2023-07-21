@@ -4,6 +4,7 @@ import type {
   Query,
 } from "firebase/firestore"
 import { useState } from "react"
+import { useQueryService } from "./DocsProvider"
 import { serializeQuery } from "./serializeQuery"
 
 let hookCount = 0
@@ -20,6 +21,8 @@ function isCollectionReference(
   return context.type === "collection"
 }
 
+const IGNORE_FUNCTIONS = ["renderWithHooks", "useState", "Object.useState"]
+
 /**
  * Returns a state string representing a unique ID for a hook, one of:
  *
@@ -33,14 +36,51 @@ export function useHookId(
   context: Query | DocumentReference | CollectionReference,
   ids?: string[]
 ): string {
+  const { debug } = useQueryService("useHookId")
+
   const [id] = useState(() => {
+    let loc = ""
+
+    if (debug) {
+      const stack =
+        new Error("Getting stacktrace...").stack?.split("\n").slice(3, 10) ?? []
+
+      let line: string | undefined
+      const functionNames: string[] = []
+
+      while ((line = stack.shift())) {
+        const functionName = line.match(/ {4}at [^ ]+/)?.[0]?.slice(7)
+        if (!functionName) continue
+        if (functionName.length < 3) continue
+        if (IGNORE_FUNCTIONS.includes(functionName)) continue
+        functionNames.push(functionName)
+      }
+
+      functionNames.reverse()
+
+      loc = functionNames?.join(">")
+    }
+
+    if (loc) {
+      if (isDocumentReference(context)) {
+        return `useDoc@${loc} #${++hookCount}`
+      } else if (isCollectionReference(context)) {
+        return `useDocs@${loc} #${++hookCount}`
+      } else {
+        return `useQuery@${loc} #${++hookCount}`
+      }
+    }
+
     if (isDocumentReference(context)) {
-      return `[doc ${context.path} #${++hookCount}]`
+      return `useDoc(${context.path}) #${++hookCount}`
     } else if (isCollectionReference(context)) {
       const idsString = ids && ids.length ? ids.join(",") : "no ids"
-      return `[docs ${context.path} #${++hookCount} (${idsString})]`
+      return `useDocs(${context.path}, [${idsString}]) #${++hookCount}`
     } else {
-      return `[query ${serializeQuery(context).slice(0, 100)} #${++hookCount}]`
+      return `useQuery(${serializeQuery(context).slice(
+        0,
+        100
+      )}) #${++hookCount}`
     }
   })
 
