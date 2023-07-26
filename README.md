@@ -19,13 +19,17 @@ data at the component level.
 
 ## What it does
 
-It does this by caching results on a per-query basis, such that you can call
+The `useQuery`, hook caches results on a per-query basis, such that you can call
 the same hook with the same query 50 times on the same page, and
 `use-firestore` will only create one single subscription, and will return the
 exact same object or array of objects to all 50 of those hooks.
 
-The `query` object doesn't need to be the same object for this to work, as long as
-its the same path, filters, and conditions it will produce a cache hit.
+The `QueryReference` object that you pass in doesn't even need to be the same
+object for this to work, as long as it has the same path, filters, and
+conditions it will produce a cache hit.
+
+The `useDoc` and `useDocs` hooks cache results on a per-collection basis, and
+create only one subscription per collection.
 
 The returned documents will be normal JavaScript objects like:
 
@@ -91,21 +95,24 @@ function Repo({ slug, tagIds }: { slug: string; tagIds: string[] }) {
 
 ## Alternatives
 
-For an alternative approach, check out @chrisbianca's [react-firebase-hooks](https://www.npmjs.com/package/react-firebase-hooks). It's an awesome package that I've used in many projects and Chris is a fantastic developer and maintainer. `react-firebase-hooks` is oriented more towards the "denomalized" architecture used in many Firestore projects, where you copy associated data onto your documents so you can doa single query and get all the data you need.
+For an alternative approach, check out [Chris Bianca's](@chrisbianca) [react-firebase-hooks](https://www.npmjs.com/package/react-firebase-hooks). It's an awesome package that I've used in many projects and Chris is a fantastic developer and maintainer. `react-firebase-hooks` is oriented more towards the "denomalized" architecture used in many Firestore projects, where you copy associated data onto your documents so you can get a sub-graph of associated documents in a single database read.
 
-If you want to take this "denormalized" approach check out the [integrify](https://www.npmjs.com/package/integrify) package which lets you declaratively set up relations between your collections. It automatically maintains Firestore triggers that the synchronize the data between those collections.
+If you want to take this "denormalized" approach check out [Anish Karandikar's](@anishkny) [integrify](https://www.npmjs.com/package/integrify) package which lets you declaratively set up relations between your collections. It automatically maintains Firestore triggers that synchronize the data between those collections.
 
 `use-firestore` takes a different approach. It encourages you do keep your data normalized, so there's a single source of truth. And then it helps you efficiently aggregate the queries needed to support your relations within a React app.
 
-|                                                  | use-firestore | react-firebase-hooks                |
-| ------------------------------------------------ | ------------- | ----------------------------------- |
-| React-based                                      | ✅            | ✅                                  |
-| Realtime updates                                 | ✅            | ✅                                  |
-| Re-use queries application-wide                  | ✅            | ❌                                  |
-| Throws errors                                    | ✅            | ❌ requires manual error handling   |
-| Memory efficient derived state on top of queries | ✅            | ❌ each hook returns unique objects |
-| Optimistic updates                               | ✅            | ❌                                  |
-| Batch document reads to avoid N+1 problem        | ✅            | ❌                                  |
+|                                                   | use-firestore | react-firebase-hooks + integrify    |
+| ------------------------------------------------- | ------------- | ----------------------------------- |
+| React-based                                       | ✅            | ✅                                  |
+| Realtime updates                                  | ✅            | ✅                                  |
+| Fetch a sub-graph of documents with a single read | ❌            | ✅                                  |
+| Re-use queries application-wide                   | ✅            | ❌                                  |
+| Throws errors                                     | ✅            | ❌ requires manual error handling   |
+| Memory efficient derived state on top of queries  | ✅            | ❌ each hook returns unique objects |
+| Optimistic updates                                | ✅            | ✅ via the Firebase SDK?            |
+| Batch document reads to avoid N+1 problem         | ✅            | ❌                                  |
+
+Of course you could combine `use-firestore` with `integrify` to mix and match the benefits of the two approaches.
 
 ## API Reference
 
