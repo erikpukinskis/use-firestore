@@ -107,7 +107,7 @@ If you want to take this "denormalized" approach check out [Anish Karandikar's](
 | Realtime updates                                  | ✅            | ✅                                  |
 | Fetch a sub-graph of documents with a single read | ❌            | ✅                                  |
 | Re-use queries application-wide                   | ✅            | ❌                                  |
-| Throws errors                                     | ✅            | ❌ requires manual error handling   |
+| Throws errors                                     | ✅            | ❌ require manual error handling    |
 | Memory efficient derived state on top of queries  | ✅            | ❌ each hook returns unique objects |
 | Optimistic updates                                | ✅            | ✅ via the Firebase SDK?            |
 | Batch document reads to avoid N+1 problem         | ✅            | ❌                                  |
