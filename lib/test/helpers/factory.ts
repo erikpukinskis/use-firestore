@@ -1,5 +1,11 @@
 import type { FirebaseApp } from "firebase/app"
-import { addDoc, collection, getFirestore } from "firebase/firestore"
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  getFirestore,
+} from "firebase/firestore"
 
 export type Tag = {
   id: string
@@ -7,13 +13,13 @@ export type Tag = {
   color: string
 }
 
-let tagIndex = 0
+let tagCount = 0
 
 export async function setUpTag(app: FirebaseApp, overrides: Partial<Tag> = {}) {
-  tagIndex++
+  tagCount++
 
   const properties = {
-    text: `Tag No.${tagIndex}`,
+    text: `Tag No.${tagCount}`,
     color: "green",
     ...overrides,
   }
@@ -27,8 +33,6 @@ export async function setUpTag(app: FirebaseApp, overrides: Partial<Tag> = {}) {
 
   return { tag }
 }
-
-const repoIndex = 0
 
 export type Repo = {
   id: string
@@ -54,7 +58,7 @@ export async function setUpRepo(
   const properties = {
     ownerId,
     slug,
-    url: `https://github.com/${ownerId}/repo-${repoIndex}`,
+    url: `https://github.com/${ownerId}/repo-${repoCount}`,
     starCount: Math.floor(Math.random() * 3),
     tagIds: [],
     ...overrides,
@@ -68,4 +72,46 @@ export async function setUpRepo(
   } as Repo
 
   return { repo }
+}
+
+export type Highlight = {
+  id: string
+  tagId: string
+  start: number
+  end: number
+}
+
+export async function setUpHighlight(
+  app: FirebaseApp,
+  overrides: Partial<Highlight> = {}
+) {
+  let tag: Tag
+
+  if (overrides.tagId) {
+    const snapshot = await getDoc(
+      doc(getFirestore(app), "tags", overrides.tagId)
+    )
+    tag = {
+      id: snapshot.id,
+      ...snapshot.data(),
+    } as Tag
+  } else {
+    const result = await setUpTag(app)
+    tag = result.tag
+  }
+
+  const properties = {
+    start: 0,
+    end: 100,
+    ...overrides,
+  }
+
+  const ref = await addDoc(collection(getFirestore(app), "tags"), properties)
+
+  const highlight = {
+    id: ref.id,
+    ...properties,
+  } as Highlight
+
+  return { highlight, tag }
 }

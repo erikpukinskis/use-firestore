@@ -8,19 +8,28 @@ data at the component level.
 **Table of Contents**
 
 - [What it does](#what-it-does)
-- [Example code](#example-code)
+- [Alternatives](#alternatives)
+- [API Reference](#api-reference)
+  - [`useQuery` hook](#usequery-hook)
+  - [`useDoc` hook with optimistic updates](#usedoc-hook-with-optimistic-updates)
+  - [`useDocs` hook](#usedocs-hook)
+  - [`deleteDocs` function](#deletedocs-function)
 - [Why](#why)
 - [Todo](#todo)
 
-### What it does
+## What it does
 
-It does this by caching results on a per-query basis, such that you can call
+The `useQuery`, hook caches results on a per-query basis, such that you can call
 the same hook with the same query 50 times on the same page, and
 `use-firestore` will only create one single subscription, and will return the
 exact same object or array of objects to all 50 of those hooks.
 
-The `query` object doesn't need to be the same object for this to work, as long as
-its the same path, filters, and conditions it will produce a cache hit.
+The `QueryReference` object that you pass in doesn't even need to be the same
+object for this to work, as long as it has the same path, filters, and
+conditions it will produce a cache hit.
+
+The `useDoc` and `useDocs` hooks cache results on a per-collection basis, and
+create only one subscription per collection.
 
 The returned documents will be normal JavaScript objects like:
 
@@ -86,21 +95,24 @@ function Repo({ slug, tagIds }: { slug: string; tagIds: string[] }) {
 
 ## Alternatives
 
-For an alternative approach, check out @chrisbianca's [react-firebase-hooks](https://www.npmjs.com/package/react-firebase-hooks). It's an awesome package that I've used in many projects and Chris is a fantastic developer and maintainer. `react-firebase-hooks` is oriented more towards the "denomalized" architecture used in many Firestore projects, where you copy associated data onto your documents so you can doa single query and get all the data you need.
+For an alternative approach, check out [Chris Bianca's](@chrisbianca) [react-firebase-hooks](https://www.npmjs.com/package/react-firebase-hooks). It's an awesome package that I've used in many projects and Chris is a fantastic developer and maintainer. `react-firebase-hooks` is oriented more towards the "denomalized" architecture used in many Firestore projects, where you copy associated data onto your documents so you can get a sub-graph of associated documents in a single database read.
 
-If you want to take this "denormalized" approach check out the [integrify](https://www.npmjs.com/package/integrify) package which lets you declaratively set up relations between your collections. It automatically maintains Firestore triggers that the synchronize the data between those collections.
+If you want to take this "denormalized" approach check out [Anish Karandikar's](@anishkny) [integrify](https://www.npmjs.com/package/integrify) package which lets you declaratively set up relations between your collections. It automatically maintains Firestore triggers that synchronize the data between those collections.
 
 `use-firestore` takes a different approach. It encourages you do keep your data normalized, so there's a single source of truth. And then it helps you efficiently aggregate the queries needed to support your relations within a React app.
 
-|                                                  | use-firestore | react-firebase-hooks                |
-| ------------------------------------------------ | ------------- | ----------------------------------- |
-| React-based                                      | ✅            | ✅                                  |
-| Realtime updates                                 | ✅            | ✅                                  |
-| Re-use queries application-wide                  | ✅            | ❌                                  |
-| Throws errors                                    | ✅            | ❌ requires manual error handling   |
-| Memory efficient derived state on top of queries | ✅            | ❌ each hook returns unique objects |
-| Optimistic updates                               | ✅            | ❌                                  |
-| Batch document reads to avoid N+1 problem        | ✅            | ❌                                  |
+|                                                   | use-firestore | react-firebase-hooks + integrify    |
+| ------------------------------------------------- | ------------- | ----------------------------------- |
+| React-based                                       | ✅            | ✅                                  |
+| Realtime updates                                  | ✅            | ✅                                  |
+| Fetch a sub-graph of documents with a single read | ❌            | ✅                                  |
+| Re-use queries application-wide                   | ✅            | ❌                                  |
+| Throws errors                                     | ✅            | ❌ require manual error handling    |
+| Memory efficient derived state on top of queries  | ✅            | ❌ each hook returns unique objects |
+| Optimistic updates                                | ✅            | ✅ via the Firebase SDK?            |
+| Batch document reads to avoid N+1 problem         | ✅            | ❌                                  |
+
+Of course you could combine `use-firestore` with `integrify` to mix and match the benefits of the two approaches.
 
 ## API Reference
 
@@ -208,6 +220,53 @@ return (
 )
 ```
 
+### `deleteDocs` function
+
+Basic deletion:
+
+```ts
+import { deleteDocs } from "use-firestore"
+import { collection, getFirestore } from "firebase/firestore"
+
+await deleteDocs(collection(getFirestore(app), "tags"), [
+  "tag123",
+  "tag456",
+  "tag789",
+])
+```
+
+Also remove the deleted doc's `id` from the `tagIds` field on an associated collection:
+
+```ts
+import { deleteDocs, andRemoveFromIds } from "use-firestore"
+
+await deleteDocs(
+  collection(getFirestore(app), "tags"),
+  ["tag123"],
+  andRemoveFromIds(collection(getFirestore(app), "repos"), "tagIds")
+)
+```
+
+Delete related docs with a 1:1 or 1:N relation:
+
+```ts
+import { deleteDocs, andDeleteAssociatedDocs } from "use-firestore"
+
+await deleteDocs(
+  collection(getFirestore(app), "tags"),
+  ["tag123"],
+  andDeleteAssociatedDocs(collection(getFirestore(app), "highlights"), "tagId")
+)
+```
+
+The above code will also delete any documents in the "highlights" collection which have the `tagId` field set to `"tag123"`, before deleting `/tags/tag123`.
+
+**Warnings**:
+
+The `deleteDocs` function will do all of the deletions and updates in a series of [batched writes](https://firebase.google.com/docs/firestore/manage-data/transactions#batched-writes). However note that if there are more than 500 updates and/or writes to do, `deleteDocs` will do several batched writes. If any batch fails this can create inconsistencies in your data.
+
+In addition, as part of its execution `deleteDocs` has to query the relations it will delete/update. If the underlying data is modified between when it does those queries and when the batches are committed, this can also introduce inconsistencies.
+
 ## Why
 
 Applications can be built a lot more simply when individual components can request the data they need, without having to worry about triggering the N+1 problem.
@@ -282,5 +341,6 @@ Additionally, if we were to use that `tags` array as a prop to a memoized compon
 - [x] Add tests
 - [x] useDoc()
 - [x] useDocs()
-- [ ] deleteDocs
+- [x] deleteDocs
 - [ ] For small collections, just query the entire thing instead of just getting a subset
+- [ ] Add post-processing/validation/type guard function to everything
