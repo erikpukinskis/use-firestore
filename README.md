@@ -14,6 +14,8 @@ data at the component level.
   - [`useDoc` hook with optimistic updates](#usedoc-hook-with-optimistic-updates)
   - [`useDocs` hook](#usedocs-hook)
   - [`deleteDocs` function](#deletedocs-function)
+  - [Nested delete](#nested-delete)
+- [Warnings](#warnings)
 - [Why](#why)
 - [Todo](#todo)
 
@@ -116,7 +118,7 @@ If you want to take this "denormalized" approach check out [Anish Karandikar's](
 | Realtime updates                                  | ✅            | ✅                                  |
 | Fetch a sub-graph of documents with a single read | ❌            | ✅                                  |
 | Re-use queries application-wide                   | ✅            | ❌                                  |
-| Throws errors                                     | ✅            | ❌ require manual error handling    |
+| Throws errors                                     | ✅            | ❌ requires manual error handling   |
 | Memory efficient derived state on top of queries  | ✅            | ❌ each hook returns unique objects |
 | Optimistic updates                                | ✅            | ✅ via the Firebase SDK?            |
 | Batch document reads to avoid N+1 problem         | ✅            | ❌                                  |
@@ -285,6 +287,8 @@ await deleteDocs(
 
 The above code will also delete any documents in the "highlights" collection which have the `tagId` field set to `"tag123"`, before deleting `/tags/tag123`.
 
+### Nested delete
+
 You can also go multiple levels deep with your deletions. For example, if every "highlight" belongs to a "tag" and every "document" has many "highlights", when you delete a tag you want to:
 
 1. Delete all of the highlights associated with that tag
@@ -314,7 +318,7 @@ await deleteDocs(
 )
 ```
 
-**Warnings**:
+## Warnings
 
 The `deleteDocs` function will do all of the deletions and updates in a series of [batched writes](https://firebase.google.com/docs/firestore/manage-data/transactions#batched-writes). However note that if there are more than 500 updates and/or writes to do, `deleteDocs` will do several batched writes. If any batch fails this can create inconsistencies in your data.
 
@@ -396,7 +400,7 @@ In this scenario, we get a few nice performance benefits:
 
 Additionally, if we were to use that `tags` array as a prop to a memoized component, it would only trigger a re-render when the collection actually changes, regardless of how many times the parent component renders.
 
-### Todo
+## Todo
 
 - [x] Unsubscribe from query when no more listeners are left
 - [x] Add tests
