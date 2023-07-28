@@ -1,10 +1,15 @@
-import type { CollectionReference, WriteBatch } from "firebase/firestore"
+import type {
+  CollectionReference,
+  Firestore,
+  WriteBatch,
+} from "firebase/firestore"
 import { getDocs, query, where, writeBatch, doc } from "firebase/firestore"
 
 type Association = {
   __type: "remove-from-ids" | "delete-associated-docs"
   collection: CollectionReference
   field: string
+  associations: Association[]
 }
 
 export async function deleteDocs(
@@ -12,20 +17,52 @@ export async function deleteDocs(
   idsToDelete: string[],
   ...associations: Association[]
 ) {
-  let currentBatch = writeBatch(collection.firestore)
+  const batches = new BatchOfBatches(collection.firestore)
 
-  const batches: WriteBatch[] = []
+  await addAssociationOperationsToBatches(batches, associations, idsToDelete)
 
-  let operationCount = 0
-
-  function incrementOperation() {
-    operationCount++
-    if (operationCount < 500) return
-
-    batches.push(currentBatch)
-    currentBatch = writeBatch(collection.firestore)
-    operationCount = 0
+  for (const id of idsToDelete) {
+    const ref = doc(collection, id)
+    batches.currentBatch.delete(ref)
+    batches.incrementOperation()
   }
+
+  for (const batch of batches.batches) {
+    await batch.commit()
+  }
+
+  if (batches.operationCount > 0) {
+    await batches.currentBatch.commit()
+  }
+}
+
+class BatchOfBatches {
+  firestore: Firestore
+  currentBatch: WriteBatch
+  batches: WriteBatch[] = []
+  operationCount = 0
+
+  constructor(firestore: Firestore) {
+    this.firestore = firestore
+    this.currentBatch = writeBatch(firestore)
+  }
+
+  incrementOperation() {
+    this.operationCount++
+    if (this.operationCount < 500) return
+
+    this.batches.push(this.currentBatch)
+    this.currentBatch = writeBatch(this.firestore)
+    this.operationCount = 0
+  }
+}
+
+async function addAssociationOperationsToBatches(
+  batches: BatchOfBatches,
+  associations: Association[],
+  idsToDelete: string[]
+) {
+  if (idsToDelete.length < 1) return
 
   for (const association of associations) {
     if (association.__type === "delete-associated-docs") {
@@ -36,9 +73,17 @@ export async function deleteDocs(
         )
       )
 
+      const associatedIds = associatedDocs.docs.map((snapshot) => snapshot.id)
+
+      await addAssociationOperationsToBatches(
+        batches,
+        association.associations,
+        associatedIds
+      )
+
       for (const associatedDoc of associatedDocs.docs) {
-        currentBatch.delete(associatedDoc.ref)
-        incrementOperation()
+        batches.currentBatch.delete(associatedDoc.ref)
+        batches.incrementOperation()
       }
     } else if (association.__type === "remove-from-ids") {
       const docsReferencingDeletedIds = await getDocs(
@@ -57,26 +102,14 @@ export async function deleteDocs(
         }
         const scrubbedIds = idsToScrub.filter((id) => !idsToDelete.includes(id))
 
-        currentBatch.update(doc.ref, { [association.field]: scrubbedIds })
-        incrementOperation()
+        batches.currentBatch.update(doc.ref, {
+          [association.field]: scrubbedIds,
+        })
+        batches.incrementOperation()
       }
     } else {
       throw new Error(`Unknown association type: ${String(association.__type)}`)
     }
-  }
-
-  for (const id of idsToDelete) {
-    const ref = doc(collection, id)
-    currentBatch.delete(ref)
-    incrementOperation()
-  }
-
-  for (const batch of batches) {
-    await batch.commit()
-  }
-
-  if (operationCount > 0) {
-    await currentBatch.commit()
   }
 }
 
@@ -88,16 +121,19 @@ export function andRemoveFromIds(
     __type: "remove-from-ids",
     collection,
     field: key,
+    associations: [],
   }
 }
 
 export function andDeleteAssociatedDocs(
   collection: CollectionReference,
-  key: string
+  key: string,
+  ...associations: Association[]
 ): Association {
   return {
     __type: "delete-associated-docs",
     collection,
     field: key,
+    associations,
   }
 }

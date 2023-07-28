@@ -8,6 +8,7 @@ import {
 } from "./deleteDocs"
 import {
   connectToEmulators,
+  setUpDocument,
   setUpHighlight,
   setUpRepo,
   setUpTag,
@@ -42,7 +43,30 @@ describe("deleteDocs", () => {
     expect(getRepoResult.data()?.tagIds).toHaveLength(0)
   })
 
-  it("removes doc id from array, even if some of the deleted ids are missing")
+  it("deletes child docs", async () => {
+    const { highlight, tag } = await setUpHighlight(testApp)
+
+    await deleteDocs(
+      collection(getFirestore(testApp), "tags"),
+      [tag.id],
+      andDeleteAssociatedDocs(
+        collection(getFirestore(testApp), "highlights"),
+        "tagId"
+      )
+    )
+
+    const getTagResult = await getDoc(
+      doc(getFirestore(testApp), "tags", tag.id)
+    )
+
+    expect(getTagResult.exists()).toBe(false)
+
+    const getHighlightResult = await getDoc(
+      doc(getFirestore(testApp), "highlights", highlight.id)
+    )
+
+    expect(getHighlightResult.exists()).toBe(false)
+  })
 
   it("deletes child docs", async () => {
     const { highlight, tag } = await setUpHighlight(testApp)
@@ -67,5 +91,48 @@ describe("deleteDocs", () => {
     )
 
     expect(getHighlightResult.exists()).toBe(false)
+  })
+
+  it("associations can go two levels deep", async () => {
+    const { highlight, tag } = await setUpHighlight(testApp)
+    const { document } = await setUpDocument(testApp, {
+      highlightIds: [highlight.id, "defg789"],
+    })
+
+    await deleteDocs(
+      collection(getFirestore(testApp), "tags"),
+      [tag.id],
+      andDeleteAssociatedDocs(
+        collection(getFirestore(testApp), "highlights"),
+        "tagId",
+        andRemoveFromIds(
+          collection(getFirestore(testApp), "documents"),
+          "highlightIds"
+        )
+      )
+    )
+
+    const getTagResult = await getDoc(
+      doc(getFirestore(testApp), "tags", tag.id)
+    )
+
+    expect(getTagResult.exists()).toBe(false)
+
+    const getHighlightResult = await getDoc(
+      doc(getFirestore(testApp), "highlights", highlight.id)
+    )
+
+    expect(getHighlightResult.exists()).toBe(false)
+
+    const getDocumentResult = await getDoc(
+      doc(getFirestore(testApp), "documents", document.id)
+    )
+
+    const highlightIds = getDocumentResult.data()?.highlightIds as
+      | string[]
+      | undefined
+
+    expect(highlightIds).toContain("defg789")
+    expect(highlightIds).not.toContain(highlight.id)
   })
 })

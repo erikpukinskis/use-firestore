@@ -103,10 +103,14 @@ export async function setUpHighlight(
   const properties = {
     start: 0,
     end: 100,
+    tagId: tag.id,
     ...overrides,
   }
 
-  const ref = await addDoc(collection(getFirestore(app), "tags"), properties)
+  const ref = await addDoc(
+    collection(getFirestore(app), "highlights"),
+    properties
+  )
 
   const highlight = {
     id: ref.id,
@@ -114,4 +118,33 @@ export async function setUpHighlight(
   } as Highlight
 
   return { highlight, tag }
+}
+
+export type Document = {
+  id: string
+  text: string
+  highlightIds: string[]
+}
+
+export async function setUpDocument(
+  app: FirebaseApp,
+  overrides: Partial<Document> = {}
+) {
+  const properties = {
+    text: "some text",
+    highlightIds: [],
+    ...overrides,
+  }
+
+  const ref = await addDoc(
+    collection(getFirestore(app), "documents"),
+    properties
+  )
+
+  const document = {
+    id: ref.id,
+    ...properties,
+  } as Document
+
+  return { document }
 }
