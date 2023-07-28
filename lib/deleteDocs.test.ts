@@ -1,6 +1,17 @@
 import { waitFor } from "@testing-library/react"
-import { collection, doc, getDoc, getFirestore } from "firebase/firestore"
-import { describe, it, expect, beforeAll, afterAll } from "vitest"
+import {
+  collection,
+  doc,
+  getDoc,
+  getFirestore,
+} from "firebase/firestore"
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+} from "vitest"
 import {
   andDeleteAssociatedDocs,
   andRemoveFromIds,
@@ -20,12 +31,17 @@ describe("deleteDocs", () => {
 
   it("removes the doc id from the arrays in a related collection", async () => {
     const { tag } = await setUpTag(testApp)
-    const { repo } = await setUpRepo(testApp, { tagIds: [tag.id] })
+    const { repo } = await setUpRepo(testApp, {
+      tagIds: [tag.id],
+    })
 
     await deleteDocs(
       collection(getFirestore(testApp), "tags"),
       [tag.id],
-      andRemoveFromIds(collection(getFirestore(testApp), "repos"), "tagIds")
+      andRemoveFromIds(
+        collection(getFirestore(testApp), "repos"),
+        "tagIds"
+      )
     )
 
     await waitFor(async () => {
@@ -41,31 +57,6 @@ describe("deleteDocs", () => {
     )
 
     expect(getRepoResult.data()?.tagIds).toHaveLength(0)
-  })
-
-  it("deletes child docs", async () => {
-    const { highlight, tag } = await setUpHighlight(testApp)
-
-    await deleteDocs(
-      collection(getFirestore(testApp), "tags"),
-      [tag.id],
-      andDeleteAssociatedDocs(
-        collection(getFirestore(testApp), "highlights"),
-        "tagId"
-      )
-    )
-
-    const getTagResult = await getDoc(
-      doc(getFirestore(testApp), "tags", tag.id)
-    )
-
-    expect(getTagResult.exists()).toBe(false)
-
-    const getHighlightResult = await getDoc(
-      doc(getFirestore(testApp), "highlights", highlight.id)
-    )
-
-    expect(getHighlightResult.exists()).toBe(false)
   })
 
   it("deletes child docs", async () => {
@@ -128,9 +119,8 @@ describe("deleteDocs", () => {
       doc(getFirestore(testApp), "documents", document.id)
     )
 
-    const highlightIds = getDocumentResult.data()?.highlightIds as
-      | string[]
-      | undefined
+    const highlightIds = getDocumentResult.data()
+      ?.highlightIds as string[] | undefined
 
     expect(highlightIds).toContain("defg789")
     expect(highlightIds).not.toContain(highlight.id)
