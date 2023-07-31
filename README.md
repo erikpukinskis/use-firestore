@@ -215,6 +215,8 @@ function Repo({ repoId }) {
 
 ### `useDocs` hook
 
+The `useDocs` hook obviously can be used to fetch multiple documents by ID in a single call....
+
 ```tsx
 import { useDocs } from "use-firestore"
 import { collection, getFirestore } from "firebase/firestore"
@@ -235,6 +237,12 @@ return (
     ))}
   </>
 )
+```
+
+... however it's most useful for efficient querying of 1:N relationships in a tree of React components:
+
+```
+[example needed]
 ```
 
 ### `deleteDocs` function
@@ -287,7 +295,7 @@ await deleteDocs(
 
 The above code will also delete any documents in the "highlights" collection which have the `tagId` field set to `"tag123"`, before deleting `/tags/tag123`.
 
-### Nested delete
+### Nested **delete**
 
 You can also go multiple levels deep with your deletions. For example, if every "highlight" belongs to a "tag" and every "document" has many "highlights", when you delete a tag you want to:
 
