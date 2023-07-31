@@ -21,7 +21,11 @@ function isCollectionReference(
   return context.type === "collection"
 }
 
-const IGNORE_FUNCTIONS = ["renderWithHooks", "useState", "Object.useState"]
+const IGNORE_FUNCTIONS = [
+  "renderWithHooks",
+  "useState",
+  "Object.useState",
+]
 
 /**
  * Returns a state string representing a unique ID for a hook, one of:
@@ -33,7 +37,11 @@ const IGNORE_FUNCTIONS = ["renderWithHooks", "useState", "Object.useState"]
  * Does not change unless the hook is unmounted (even if the arguments change).
  */
 export function useHookId(
-  context: Query | DocumentReference | CollectionReference,
+  context:
+    | Query
+    | DocumentReference
+    | CollectionReference
+    | string,
   ids?: string[]
 ): string {
   const { debug } = useQueryService("useHookId")
@@ -43,13 +51,17 @@ export function useHookId(
 
     if (debug) {
       const stack =
-        new Error("Getting stacktrace...").stack?.split("\n").slice(3, 10) ?? []
+        new Error("Getting stacktrace...").stack
+          ?.split("\n")
+          .slice(3, 10) ?? []
 
       let line: string | undefined
       const functionNames: string[] = []
 
       while ((line = stack.shift())) {
-        const functionName = line.match(/ {4}at [^ ]+/)?.[0]?.slice(7)
+        const functionName = line
+          .match(/ {4}at [^ ]+/)?.[0]
+          ?.slice(7)
         if (!functionName) continue
         if (functionName.length < 3) continue
         if (IGNORE_FUNCTIONS.includes(functionName)) continue
@@ -62,7 +74,9 @@ export function useHookId(
     }
 
     if (loc) {
-      if (isDocumentReference(context)) {
+      if (typeof context === "string") {
+        return `${context}@${loc} #${++hookCount}`
+      } else if (isDocumentReference(context)) {
         return `useDoc@${loc} #${++hookCount}`
       } else if (isCollectionReference(context)) {
         return `useDocs@${loc} #${++hookCount}`
@@ -71,11 +85,16 @@ export function useHookId(
       }
     }
 
-    if (isDocumentReference(context)) {
+    if (typeof context === "string") {
+      return `${context} #${++hookCount}`
+    } else if (isDocumentReference(context)) {
       return `useDoc(${context.path}) #${++hookCount}`
     } else if (isCollectionReference(context)) {
-      const idsString = ids && ids.length ? ids.join(",") : "no ids"
-      return `useDocs(${context.path}, [${idsString}]) #${++hookCount}`
+      const idsString =
+        ids && ids.length ? ids.join(",") : "no ids"
+      return `useDocs(${
+        context.path
+      }, [${idsString}]) #${++hookCount}`
     } else {
       return `useQuery(${serializeQuery(context).slice(
         0,

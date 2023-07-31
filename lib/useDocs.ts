@@ -33,9 +33,11 @@ import { useHookId } from "./useHookId"
  *
  * @returns a `[doc, updateDoc]` tuple, similar to what `useState` returns.
  */
-export function useDoc<T extends { id: string }>(ref: DocumentReference) {
+export function useDoc<T extends { id: string }>(
+  ref: DocumentReference | undefined
+) {
   const [doc, setDoc] = useState<T | undefined>()
-  const hookId = useHookId(ref)
+  const hookId = useHookId(ref ?? "useDoc")
   const service = useCollectionService("useDoc")
   const firstRenderRef = useRef(true)
   const mountedRef = useRef(true)
@@ -53,6 +55,11 @@ export function useDoc<T extends { id: string }>(ref: DocumentReference) {
       setDoc(undefined)
     }
 
+    if (!ref) {
+      setDoc(undefined)
+      return
+    }
+
     const { unregister, cachedDocs } = service.registerDocsHook(
       hookId,
       collection(ref.firestore, ref.parent.path),
@@ -68,7 +75,7 @@ export function useDoc<T extends { id: string }>(ref: DocumentReference) {
     }
 
     return unregister
-  }, [ref.parent.path])
+  }, [ref?.parent.path])
 
   useEffect(() => {
     if (firstRenderRef.current) {
@@ -76,15 +83,25 @@ export function useDoc<T extends { id: string }>(ref: DocumentReference) {
       return
     }
 
+    if (!ref) {
+      return
+    }
+
     log("doc id for", hookId, "changed to", ref.id)
     setDoc(undefined)
     service.updateDocIds(ref.parent.path, hookId, [ref.id])
-  }, [ref.parent.path, ref.id])
+  }, [ref?.parent.path, ref?.id])
 
   async function update(updates: Partial<T>) {
+    if (!ref) {
+      throw new Error("Cannot update doc, no id provided")
+    }
+
     setDoc((doc) => {
       if (!doc) {
-        throw new Error("Cannot update doc before it has been loaded")
+        throw new Error(
+          "Cannot update doc before it has been loaded"
+        )
       }
 
       return { ...doc, ...updates }
@@ -114,7 +131,8 @@ export function useDocs<T extends { id: string }>(
   )
 
   useEffect(() => {
-    setDocs(undefined)
+    setDocs(ids.length < 1 ? [] : undefined)
+
     const { unregister, cachedDocs } = service.registerDocsHook(
       hookId,
       collection,
@@ -131,7 +149,7 @@ export function useDocs<T extends { id: string }>(
   }, [collection.path])
 
   useEffect(() => {
-    setDocs(undefined)
+    setDocs(ids.length < 1 ? [] : undefined)
 
     if (firstRenderRef.current) {
       firstRenderRef.current = false
