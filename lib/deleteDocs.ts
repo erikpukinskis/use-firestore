@@ -3,7 +3,13 @@ import type {
   Firestore,
   WriteBatch,
 } from "firebase/firestore"
-import { getDocs, query, where, writeBatch, doc } from "firebase/firestore"
+import {
+  getDocs,
+  query,
+  where,
+  writeBatch,
+  doc,
+} from "firebase/firestore"
 
 type Association = {
   __type: "remove-from-ids" | "delete-associated-docs"
@@ -19,7 +25,11 @@ export async function deleteDocs(
 ) {
   const batches = new BatchOfBatches(collection.firestore)
 
-  await addAssociationOperationsToBatches(batches, associations, idsToDelete)
+  await addAssociationOperationsToBatches(
+    batches,
+    associations,
+    idsToDelete
+  )
 
   for (const id of idsToDelete) {
     const ref = doc(collection, id)
@@ -73,7 +83,9 @@ async function addAssociationOperationsToBatches(
         )
       )
 
-      const associatedIds = associatedDocs.docs.map((snapshot) => snapshot.id)
+      const associatedIds = associatedDocs.docs.map(
+        (snapshot) => snapshot.id
+      )
 
       await addAssociationOperationsToBatches(
         batches,
@@ -89,18 +101,26 @@ async function addAssociationOperationsToBatches(
       const docsReferencingDeletedIds = await getDocs(
         query(
           association.collection,
-          where(association.field, "array-contains-any", idsToDelete)
+          where(
+            association.field,
+            "array-contains-any",
+            idsToDelete
+          )
         )
       )
 
       for (const doc of docsReferencingDeletedIds.docs) {
-        const idsToScrub = doc.data()[association.field] as string[]
+        const idsToScrub = doc.data()[
+          association.field
+        ] as string[]
         if (!Array.isArray(idsToScrub)) {
           throw new Error(
             `Field ${association.field} in andRemoveFromIds(collection, "${association.field}") must be an array field.`
           )
         }
-        const scrubbedIds = idsToScrub.filter((id) => !idsToDelete.includes(id))
+        const scrubbedIds = idsToScrub.filter(
+          (id) => !idsToDelete.includes(id)
+        )
 
         batches.currentBatch.update(doc.ref, {
           [association.field]: scrubbedIds,
@@ -108,7 +128,9 @@ async function addAssociationOperationsToBatches(
         batches.incrementOperation()
       }
     } else {
-      throw new Error(`Unknown association type: ${String(association.__type)}`)
+      throw new Error(
+        `Unknown association type: ${String(association.__type)}`
+      )
     }
   }
 }

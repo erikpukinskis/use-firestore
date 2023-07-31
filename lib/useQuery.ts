@@ -29,7 +29,9 @@ import { useHookId } from "./useHookId"
  * A subscription to Firestore will be created for each unique query, and the
  * results of the hook will be updated in realtime.
  */
-export function useQuery<T extends { id: string }>(query: Query<DocumentData>) {
+export function useQuery<T extends { id: string }>(
+  query: Query<DocumentData>
+) {
   const [docs, setDocs] = useState<Array<T> | undefined>()
   const hookId = useHookId(query)
   const service = useQueryService("useQuery")
@@ -44,15 +46,13 @@ export function useQuery<T extends { id: string }>(query: Query<DocumentData>) {
       log(hookId, "query changed to", serializeQuery(query))
     }
 
-    const { unregister, cachedResults } = service.registerQueryHook(
-      hookId,
-      query,
-      (docs) => {
+    const { unregister, cachedResults } =
+      service.registerQueryHook(hookId, query, (docs) => {
         setDocs(docs as Array<unknown> as Array<T>)
-      }
-    )
+      })
 
-    if (cachedResults) setDocs(cachedResults as Array<unknown> as Array<T>)
+    if (cachedResults)
+      setDocs(cachedResults as Array<unknown> as Array<T>)
 
     return unregister
   }, [serializeQuery(query)])

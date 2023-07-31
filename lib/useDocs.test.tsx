@@ -19,7 +19,10 @@ import {
   beforeEach,
 } from "vitest"
 import { DocsProvider } from "./DocsProvider"
-import { connectToEmulators, testApp } from "./test/helpers/connectToEmulators"
+import {
+  connectToEmulators,
+  testApp,
+} from "./test/helpers/connectToEmulators"
 import { mockSubscriptions } from "./test/helpers/mockSubscriptions"
 import { useDoc, useDocs } from "./useDocs"
 import { useQuery } from "./useQuery"
@@ -27,7 +30,8 @@ import type { Repo, Tag } from "~/test/helpers/factory"
 import { setUpRepo, setUpTag } from "~/test/helpers/factory"
 
 vi.mock("firebase/firestore", async (importOriginal) => {
-  const original: { onSnapshot(this: void): void } = await importOriginal()
+  const original: { onSnapshot(this: void): void } =
+    await importOriginal()
 
   return {
     ...original,
@@ -52,7 +56,10 @@ describe("useDocs", () => {
     })
 
     const { result } = renderHook(
-      () => useDoc<Repo>(doc(getFirestore(testApp), "repos", repo.id)),
+      () =>
+        useDoc<Repo>(
+          doc(getFirestore(testApp), "repos", repo.id)
+        ),
       {
         wrapper: DocsProvider,
       }
@@ -74,7 +81,9 @@ describe("useDocs", () => {
       ownerId: "whitney",
     })
 
-    const freshDoc = await getDoc(doc(getFirestore(testApp), "repos", repo.id))
+    const freshDoc = await getDoc(
+      doc(getFirestore(testApp), "repos", repo.id)
+    )
 
     expect(freshDoc.data()).toMatchObject({
       ownerId: "whitney",
@@ -123,8 +132,17 @@ describe("useDocs", () => {
     )
   }
 
-  function Repo({ slug, tagIds }: { slug: string; tagIds: string[] }) {
-    const tags = useDocs<Tag>(collection(getFirestore(testApp), "tags"), tagIds)
+  function Repo({
+    slug,
+    tagIds,
+  }: {
+    slug: string
+    tagIds: string[]
+  }) {
+    const tags = useDocs<Tag>(
+      collection(getFirestore(testApp), "tags"),
+      tagIds
+    )
 
     if (!tags) return null
 
@@ -144,7 +162,9 @@ describe("useDocs", () => {
     const { tag: tag1 } = await setUpTag(testApp)
     const { tag: tag2 } = await setUpTag(testApp)
 
-    const { repo: repo1 } = await setUpRepo(testApp, { tagIds: [tag1.id] })
+    const { repo: repo1 } = await setUpRepo(testApp, {
+      tagIds: [tag1.id],
+    })
     await setUpRepo(testApp, {
       ownerId: repo1.ownerId,
       tagIds: [tag2.id],
@@ -156,20 +176,31 @@ describe("useDocs", () => {
 
     const { onSnapshot } = mockSubscriptions()
 
-    const { getAllByRole } = render(<ListRepos ownerId={repo1.ownerId} />, {
-      wrapper: DocsProvider,
-    })
+    const { getAllByRole } = render(
+      <ListRepos ownerId={repo1.ownerId} />,
+      {
+        wrapper: DocsProvider,
+      }
+    )
 
-    await waitFor(() => expect(getAllByRole("listitem")).toHaveLength(3))
+    await waitFor(() =>
+      expect(getAllByRole("listitem")).toHaveLength(3)
+    )
 
     expect(onSnapshot).toHaveBeenCalledTimes(2)
   })
 
   it("re-subscribes a collection when we add new ids", async () => {
-    const { tag: tag1 } = await setUpTag(testApp, { text: "one" })
-    const { tag: tag2 } = await setUpTag(testApp, { text: "two" })
+    const { tag: tag1 } = await setUpTag(testApp, {
+      text: "one",
+    })
+    const { tag: tag2 } = await setUpTag(testApp, {
+      text: "two",
+    })
 
-    const { repo } = await setUpRepo(testApp, { tagIds: [tag1.id] })
+    const { repo } = await setUpRepo(testApp, {
+      tagIds: [tag1.id],
+    })
 
     const { onSnapshot } = mockSubscriptions()
 
@@ -180,13 +211,18 @@ describe("useDocs", () => {
       }
     )
 
-    await waitFor(() => expect(getAllByRole("listitem")).toHaveLength(1))
+    await waitFor(() =>
+      expect(getAllByRole("listitem")).toHaveLength(1)
+    )
 
     expect(onSnapshot).toHaveBeenCalledTimes(2)
 
-    await updateDoc(doc(getFirestore(testApp), "repos", repo.id), {
-      tagIds: [tag1.id, tag2.id],
-    })
+    await updateDoc(
+      doc(getFirestore(testApp), "repos", repo.id),
+      {
+        tagIds: [tag1.id, tag2.id],
+      }
+    )
 
     await waitFor(() => getByText("two"))
 

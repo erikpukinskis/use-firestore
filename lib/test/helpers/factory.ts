@@ -15,7 +15,10 @@ export type Tag = {
 
 let tagCount = 0
 
-export async function setUpTag(app: FirebaseApp, overrides: Partial<Tag> = {}) {
+export async function setUpTag(
+  app: FirebaseApp,
+  overrides: Partial<Tag> = {}
+) {
   tagCount++
 
   const properties = {
@@ -24,7 +27,10 @@ export async function setUpTag(app: FirebaseApp, overrides: Partial<Tag> = {}) {
     ...overrides,
   }
 
-  const ref = await addDoc(collection(getFirestore(app), "tags"), properties)
+  const ref = await addDoc(
+    collection(getFirestore(app), "tags"),
+    properties
+  )
 
   const tag = {
     id: ref.id,
@@ -64,7 +70,10 @@ export async function setUpRepo(
     ...overrides,
   }
 
-  const ref = await addDoc(collection(getFirestore(app), "repos"), properties)
+  const ref = await addDoc(
+    collection(getFirestore(app), "repos"),
+    properties
+  )
 
   const repo = {
     id: ref.id,

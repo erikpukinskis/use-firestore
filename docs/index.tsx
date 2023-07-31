@@ -4,6 +4,10 @@ import { render } from "react-dom"
 import * as HomePage from "./HomePage.docs"
 
 render(
-  <DocsApp icon="fire" logo="Firestore Hooks" docs={[HomePage]} />,
+  <DocsApp
+    icon="fire"
+    logo="Firestore Hooks"
+    docs={[HomePage]}
+  />,
   document.getElementById("root")
 )

@@ -2,7 +2,10 @@ import type { DocumentData, Query } from "firebase/firestore"
 import { onSnapshot } from "firebase/firestore"
 import { serializeQuery } from "./serializeQuery"
 
-type CachedDocument = DocumentData & { id: string; __path: string }
+type CachedDocument = DocumentData & {
+  id: string
+  __path: string
+}
 
 export const UNSUBSCRIBE_DELAY = 100
 
@@ -30,10 +33,16 @@ export class QueryService {
   // For queries...
   ownerByQueryKey: Record<string, string> = {}
   unsubscribeFunctionsByQueryKey: Record<string, () => void> = {}
-  queryListenersByKey: Record<string, Array<(docs: CachedDocument[]) => void>> =
+  queryListenersByKey: Record<
+    string,
+    Array<(docs: CachedDocument[]) => void>
+  > = {}
+  lastQueryResultByKey: Record<string, Array<CachedDocument>> =
     {}
-  lastQueryResultByKey: Record<string, Array<CachedDocument>> = {}
-  assignQueryOwnerFunctionsByKey: Record<string, Array<() => void>> = {}
+  assignQueryOwnerFunctionsByKey: Record<
+    string,
+    Array<() => void>
+  > = {}
 
   constructor(debug: boolean) {
     this.debug = debug
@@ -72,7 +81,8 @@ export class QueryService {
 
     if (!assignQueryOwnerFunctions) {
       assignQueryOwnerFunctions = []
-      this.assignQueryOwnerFunctionsByKey[queryKey] = assignQueryOwnerFunctions
+      this.assignQueryOwnerFunctionsByKey[queryKey] =
+        assignQueryOwnerFunctions
     }
 
     queryListeners.push(onDocs)
@@ -81,7 +91,9 @@ export class QueryService {
      * Stop passing document updates to the hook
      */
     const removeListener = () => {
-      const index = queryListeners.findIndex((func) => func === onDocs)
+      const index = queryListeners.findIndex(
+        (func) => func === onDocs
+      )
 
       if (index < 0) {
         throw new Error(
@@ -99,30 +111,41 @@ export class QueryService {
       this.log("subscribing to query", queryKey)
       this.ownerByQueryKey[queryKey] = hookId
 
-      const unsubscribeFromQuery = onSnapshot(q, (querySnapshot) => {
-        const docs: CachedDocument[] = []
+      const unsubscribeFromQuery = onSnapshot(
+        q,
+        (querySnapshot) => {
+          const docs: CachedDocument[] = []
 
-        this.log(queryKey, "snapshot with", querySnapshot.size, "docs")
+          this.log(
+            queryKey,
+            "snapshot with",
+            querySnapshot.size,
+            "docs"
+          )
 
-        querySnapshot.forEach((docSnapshot) => {
-          const path = docSnapshot.ref.path
-          const doc = {
-            id: docSnapshot.id,
-            __path: path,
-            ...docSnapshot.data(),
+          querySnapshot.forEach((docSnapshot) => {
+            const path = docSnapshot.ref.path
+            const doc = {
+              id: docSnapshot.id,
+              __path: path,
+              ...docSnapshot.data(),
+            }
+
+            docs.push(doc)
+          })
+
+          this.lastQueryResultByKey[queryKey] = docs
+
+          for (const listener of this.queryListenersByKey[
+            queryKey
+          ]) {
+            listener(docs)
           }
-
-          docs.push(doc)
-        })
-
-        this.lastQueryResultByKey[queryKey] = docs
-
-        for (const listener of this.queryListenersByKey[queryKey]) {
-          listener(docs)
         }
-      })
+      )
 
-      this.unsubscribeFunctionsByQueryKey[queryKey] = unsubscribeFromQuery
+      this.unsubscribeFunctionsByQueryKey[queryKey] =
+        unsubscribeFromQuery
     }
 
     /**

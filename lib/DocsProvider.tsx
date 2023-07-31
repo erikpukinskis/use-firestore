@@ -22,14 +22,19 @@ type DocsProviderProps = {
   debug?: boolean
 }
 
-export function DocsProvider({ children, debug = false }: DocsProviderProps) {
+export function DocsProvider({
+  children,
+  debug = false,
+}: DocsProviderProps) {
   const [services] = useState(() => ({
     queryService: new QueryService(debug),
     collectionService: new CollectionService(debug),
   }))
 
   return (
-    <DocsContext.Provider value={services}>{children}</DocsContext.Provider>
+    <DocsContext.Provider value={services}>
+      {children}
+    </DocsContext.Provider>
   )
 }
 
@@ -37,7 +42,9 @@ export function useQueryService(hookName: string) {
   const context = useContext(DocsContext)
 
   if (!isInitialized(context)) {
-    throw new Error(`${hookName} cannot be used outside of a DocsProvider`)
+    throw new Error(
+      `${hookName} cannot be used outside of a DocsProvider`
+    )
   }
 
   return context.queryService
@@ -47,7 +54,9 @@ export function useCollectionService(hookName: string) {
   const context = useContext(DocsContext)
 
   if (!isInitialized(context)) {
-    throw new Error(`${hookName} cannot be used outside of a DocsProvider`)
+    throw new Error(
+      `${hookName} cannot be used outside of a DocsProvider`
+    )
   }
 
   return context.collectionService

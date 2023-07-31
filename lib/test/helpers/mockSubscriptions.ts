@@ -13,7 +13,9 @@ import { testApp } from "./connectToEmulators"
 
 const originalOnSnapshot = Firestore.onSnapshot
 
-type SnapshotHandler = (snapshot: DocumentSnapshot | QuerySnapshot) => void
+type SnapshotHandler = (
+  snapshot: DocumentSnapshot | QuerySnapshot
+) => void
 
 /**
  * Mocks the Firestore onSnapshot function

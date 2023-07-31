@@ -1,9 +1,23 @@
 import { waitFor } from "@testing-library/react"
 import { renderHook } from "@testing-library/react-hooks"
-import { collection, getFirestore, query, where } from "firebase/firestore"
-import { describe, it, expect, beforeAll, afterAll } from "vitest"
+import {
+  collection,
+  getFirestore,
+  query,
+  where,
+} from "firebase/firestore"
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+} from "vitest"
 import { DocsProvider } from "./DocsProvider"
-import { connectToEmulators, testApp } from "./test/helpers/connectToEmulators"
+import {
+  connectToEmulators,
+  testApp,
+} from "./test/helpers/connectToEmulators"
 import { useQuery } from "./useQuery"
 import * as factory from "~/test/helpers/factory"
 import type { Repo } from "~/test/helpers/factory"
