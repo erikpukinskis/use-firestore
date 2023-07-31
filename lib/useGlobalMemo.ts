@@ -65,7 +65,9 @@ export function useGlobalMemo<GeneratedValue>(
   dependencies: Array<Serializable>
 ) {
   if (/\|/.test(cacheKey)) {
-    throw new Error("useGlobalMemo cacheKey cannot use the | character")
+    throw new Error(
+      "useGlobalMemo cacheKey cannot use the | character"
+    )
   }
 
   const serialized = dependencies.map(serialize)
@@ -88,7 +90,13 @@ export function useGlobalMemo<GeneratedValue>(
 /**
  * These are the data types that can be used as dependencies
  */
-type Serializable = object | string | number | null | undefined | boolean
+type Serializable =
+  | object
+  | string
+  | number
+  | null
+  | undefined
+  | boolean
 
 /**
  * Returns a unique string for a given dependency
@@ -102,7 +110,10 @@ function serialize(dependency: Serializable) {
     return address
   }
 
-  if (typeof dependency === "number" && dependency > ADDRESS_START) {
+  if (
+    typeof dependency === "number" &&
+    dependency > ADDRESS_START
+  ) {
     throw new Error(
       `Cannot use ${dependency} as a dependency with useGlobalMemo because it's too large. We use the integers over ${
         ADDRESS_START - 1

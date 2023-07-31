@@ -19,7 +19,9 @@ describe("serializeQuery", () => {
       )
     )
 
-    expect(serialized).toEqual(`repos?filter=propertyX.in:"a",1,1.5,true,null`)
+    expect(serialized).toEqual(
+      `repos?filter=propertyX.in:"a",1,1.5,true,null`
+    )
   })
 
   it("serializes multiple constraints", () => {
@@ -45,7 +47,9 @@ describe("serializeQuery", () => {
       )
     )
 
-    expect(serialized).toEqual(`stories?order=projectId:asc,title:asc`)
+    expect(serialized).toEqual(
+      `stories?order=projectId:asc,title:asc`
+    )
   })
 
   it("serializes reference values", () => {

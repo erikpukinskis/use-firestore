@@ -22,7 +22,10 @@ export function serializeQuery(query: Query<DocumentData>) {
     const path = _query.path.segments.join("/")
 
     const orders = _query.explicitOrderBy
-      .map(({ dir, field: { segments } }) => `${segments.join("/")}:${dir}`)
+      .map(
+        ({ dir, field: { segments } }) =>
+          `${segments.join("/")}:${dir}`
+      )
       .join(",")
 
     const filters = _query.filters.map((filter) => {
@@ -40,19 +43,26 @@ export function serializeQuery(query: Query<DocumentData>) {
     const parameters = []
 
     if (orders.length) parameters.push(`order=${orders}`)
-    if (filters.length) parameters.push(`filter=${filters.join("&filter=")}`)
+    if (filters.length)
+      parameters.push(`filter=${filters.join("&filter=")}`)
     if (limit != null)
       parameters.push(
         `limit=${serialize(limit)}`,
         `limitType=${serialize(limitType)}`
       )
-    if (startAt != null) parameters.push(`startAt=${serialize(startAt)}`)
-    if (endAt != null) parameters.push(`endAt=${serialize(endAt)}`)
+    if (startAt != null)
+      parameters.push(`startAt=${serialize(startAt)}`)
+    if (endAt != null)
+      parameters.push(`endAt=${serialize(endAt)}`)
 
     return `${path}?${parameters.join("&")}`
   } catch (e) {
     console.error(
-      `Error serializing query:\n${JSON.stringify(_query, null, 4)}`
+      `Error serializing query:\n${JSON.stringify(
+        _query,
+        null,
+        4
+      )}`
     )
 
     throw e
@@ -111,7 +121,10 @@ type Firestore3Query = Query<DocumentData> & {
       segments: string[]
       canonicalString(): string
     }
-    explicitOrderBy: { dir: string; field: { segments: string[] } }[]
+    explicitOrderBy: {
+      dir: string
+      field: { segments: string[] }
+    }[]
     filters: FirestoreFilter[]
     limit: number | null
     startAt: Serializable
@@ -136,7 +149,9 @@ type CompoundFilter = {
   op: keyof typeof SERIALIZED_OPS
 }
 
-function isSingleFilter(filter: FirestoreFilter): filter is SingleFilter {
+function isSingleFilter(
+  filter: FirestoreFilter
+): filter is SingleFilter {
   return Object.prototype.hasOwnProperty.call(filter, "field")
 }
 
@@ -165,7 +180,9 @@ function serialize(value: Serializable): string {
   }
 
   throw new Error(
-    `use-firestore doesn't know how to serialize ${JSON.stringify(value)}`
+    `use-firestore doesn't know how to serialize ${JSON.stringify(
+      value
+    )}`
   )
 }
 
@@ -187,7 +204,9 @@ const VALUE_OBJECT_KEYS = [
   "referenceValue",
 ]
 
-function isValueObject(object: Record<string, unknown>): object is ValueObject {
+function isValueObject(
+  object: Record<string, unknown>
+): object is ValueObject {
   return VALUE_OBJECT_KEYS.some((key) =>
     Object.prototype.hasOwnProperty.call(object, key)
   )
@@ -197,7 +216,9 @@ type ValuesObject = {
   values: ValueObject[]
 }
 
-function isValuesObject(value: Serializable): value is ValuesObject {
+function isValuesObject(
+  value: Serializable
+): value is ValuesObject {
   if (typeof value !== "object") return false
 
   const values = (value as ValuesObject).values
@@ -220,9 +241,17 @@ function serializeValue(value: ValueObject) {
     return value.referenceValue
   } else {
     throw new Error(
-      `use-firestore can't serialize value object ${JSON.stringify(value)}`
+      `use-firestore can't serialize value object ${JSON.stringify(
+        value
+      )}`
     )
   }
 }
 
-type Serializable = string | number | null | undefined | boolean | ValuesObject
+type Serializable =
+  | string
+  | number
+  | null
+  | undefined
+  | boolean
+  | ValuesObject

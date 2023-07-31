@@ -14,6 +14,8 @@ data at the component level.
   - [`useDoc` hook with optimistic updates](#usedoc-hook-with-optimistic-updates)
   - [`useDocs` hook](#usedocs-hook)
   - [`deleteDocs` function](#deletedocs-function)
+  - [Nested delete](#nested-delete)
+- [Warnings](#warnings)
 - [Why](#why)
 - [Todo](#todo)
 
@@ -75,8 +77,17 @@ function ListRepos({ ownerId }: ListReposProps) {
   )
 }
 
-function Repo({ slug, tagIds }: { slug: string; tagIds: string[] }) {
-  const tags = useDocs<Tag>(collection(getFirestore(testApp), "tags"), tagIds)
+function Repo({
+  slug,
+  tagIds,
+}: {
+  slug: string
+  tagIds: string[]
+}) {
+  const tags = useDocs<Tag>(
+    collection(getFirestore(testApp), "tags"),
+    tagIds
+  )
 
   if (!tags) return null
 
@@ -107,7 +118,7 @@ If you want to take this "denormalized" approach check out [Anish Karandikar's](
 | Realtime updates                                  | ✅            | ✅                                  |
 | Fetch a sub-graph of documents with a single read | ❌            | ✅                                  |
 | Re-use queries application-wide                   | ✅            | ❌                                  |
-| Throws errors                                     | ✅            | ❌ require manual error handling    |
+| Throws errors                                     | ✅            | ❌ requires manual error handling   |
 | Memory efficient derived state on top of queries  | ✅            | ❌ each hook returns unique objects |
 | Optimistic updates                                | ✅            | ✅ via the Firebase SDK?            |
 | Batch document reads to avoid N+1 problem         | ✅            | ❌                                  |
@@ -133,7 +144,10 @@ export function App() {
   const [teamId] = useQueryParam("teamId")
 
   const users = useQuery(
-    query(collection(getFirestore(app), "users"), where("teamId", "==", teamId))
+    query(
+      collection(getFirestore(app), "users"),
+      where("teamId", "==", teamId)
+    )
   )
 
   if (!users) return null
@@ -201,11 +215,16 @@ function Repo({ repoId }) {
 
 ### `useDocs` hook
 
+The `useDocs` hook obviously can be used to fetch multiple documents by ID in a single call....
+
 ```tsx
 import { useDocs } from "use-firestore"
 import { collection, getFirestore } from "firebase/firestore"
 
-const tags = useDocs<Tag>(collection(getFirestore(app), "tags"), tagIds)
+const tags = useDocs<Tag>(
+  collection(getFirestore(app), "tags"),
+  tagIds
+)
 
 if (!tags) return null
 
@@ -218,6 +237,12 @@ return (
     ))}
   </>
 )
+```
+
+... however it's most useful for efficient querying of 1:N relationships in a tree of React components:
+
+```
+[example needed]
 ```
 
 ### `deleteDocs` function
@@ -243,25 +268,65 @@ import { deleteDocs, andRemoveFromIds } from "use-firestore"
 await deleteDocs(
   collection(getFirestore(app), "tags"),
   ["tag123"],
-  andRemoveFromIds(collection(getFirestore(app), "repos"), "tagIds")
+  andRemoveFromIds(
+    collection(getFirestore(app), "repos"),
+    "tagIds"
+  )
 )
 ```
 
 Delete related docs with a 1:1 or 1:N relation:
 
 ```ts
-import { deleteDocs, andDeleteAssociatedDocs } from "use-firestore"
+import {
+  deleteDocs,
+  andDeleteAssociatedDocs,
+} from "use-firestore"
 
 await deleteDocs(
   collection(getFirestore(app), "tags"),
   ["tag123"],
-  andDeleteAssociatedDocs(collection(getFirestore(app), "highlights"), "tagId")
+  andDeleteAssociatedDocs(
+    collection(getFirestore(app), "highlights"),
+    "tagId"
+  )
 )
 ```
 
 The above code will also delete any documents in the "highlights" collection which have the `tagId` field set to `"tag123"`, before deleting `/tags/tag123`.
 
-**Warnings**:
+### Nested **delete**
+
+You can also go multiple levels deep with your deletions. For example, if every "highlight" belongs to a "tag" and every "document" has many "highlights", when you delete a tag you want to:
+
+1. Delete all of the highlights associated with that tag
+2. Remove all of those highlights from any documents they are referenced in
+3. Finally, delete the highlights.
+
+The code for that would look like:
+
+```ts
+import {
+  deleteDocs,
+  andDeleteAssociatedDocs,
+  andRemoveFromIds,
+} from "use-firestore"
+
+await deleteDocs(
+  collection(getFirestore(app), "tags"),
+  [tag.id],
+  andDeleteAssociatedDocs(
+    collection(getFirestore(app), "highlights"),
+    "tagId",
+    andRemoveFromIds(
+      collection(getFirestore(app), "documents"),
+      "highlightIds"
+    )
+  )
+)
+```
+
+## Warnings
 
 The `deleteDocs` function will do all of the deletions and updates in a series of [batched writes](https://firebase.google.com/docs/firestore/manage-data/transactions#batched-writes). However note that if there are more than 500 updates and/or writes to do, `deleteDocs` will do several batched writes. If any batch fails this can create inconsistencies in your data.
 
@@ -290,7 +355,9 @@ import { query, getFirestore } from "firebase/firestore"
 import { keyBy } from "lodash"
 
 function StoryTable() {
-  const stories = useQuery(query(collection(getFirestore(app), "stories")))
+  const stories = useQuery(
+    query(collection(getFirestore(app), "stories"))
+  )
 
   if (!stories) return null
 
@@ -304,8 +371,14 @@ function StoryTable() {
 }
 
 function StoryRow({ title, tagIds }) {
-  const tags = useQuery(query(collection(getFirestore(app), "tags")))
-  const tagsById = useGlobalMemo("tagsById", () => tags && keyBy(tags), [tags])
+  const tags = useQuery(
+    query(collection(getFirestore(app), "tags"))
+  )
+  const tagsById = useGlobalMemo(
+    "tagsById",
+    () => tags && keyBy(tags),
+    [tags]
+  )
 
   if (!tagsById) return null
 
@@ -335,7 +408,7 @@ In this scenario, we get a few nice performance benefits:
 
 Additionally, if we were to use that `tags` array as a prop to a memoized component, it would only trigger a re-render when the collection actually changes, regardless of how many times the parent component renders.
 
-### Todo
+## Todo
 
 - [x] Unsubscribe from query when no more listeners are left
 - [x] Add tests

@@ -36,14 +36,18 @@
  * @param message Error message to throw when the context is used before being initialized
  * @returns a proxy object with whatever type you specify
  */
-export function makeUninitializedContext<ContextType>(message: string) {
+export function makeUninitializedContext<ContextType>(
+  message: string
+) {
   return new Proxy(
     {},
     {
       get(target, prop) {
         if (prop === "__isUninitializedContext") return true
 
-        throw new Error(`${message}: tried getting context.${prop.toString()}`)
+        throw new Error(
+          `${message}: tried getting context.${prop.toString()}`
+        )
       },
     }
   ) as ContextType
@@ -70,5 +74,6 @@ type UnititializedContext = Record<string, unknown> & {
  */
 export function isInitialized(value: unknown) {
   if (typeof value !== "object") return true
-  return !(value as UnititializedContext).__isUninitializedContext
+  return !(value as UnititializedContext)
+    .__isUninitializedContext
 }
