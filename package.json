@@ -1,6 +1,6 @@
 {
   "name": "use-firestore",
-  "version": "0.13.0",
+  "version": "0.13.1-beta.0",
   "license": "MIT",
   "main": "./dist/lib.umd.js",
   "module": "./dist/lib.es.js",
