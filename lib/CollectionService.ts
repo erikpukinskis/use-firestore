@@ -67,6 +67,7 @@ export class CollectionService {
     string,
     CollectionReference
   > = {}
+  waitingForRegistrationsOn: Record<string, boolean> = {}
 
   constructor(debug: boolean) {
     this.debug = debug
@@ -190,20 +191,40 @@ export class CollectionService {
         collection.path
       ] = noop
       this.log(
-        "waiting to see if other hooks will query",
+        "waiting to see if other hooks will register",
         collection.path,
-        "..."
+        "ids..."
       )
-      setTimeout(() => this.subscribe(collection.path))
+      this.waitingForRegistrationsOn[collection.path] = true
+      setTimeout(() => {
+        this.log("Done waiting for", collection.path, "ids.")
+        this.subscribe(collection.path)
+      })
     }
 
+    const idsMissing: string[] = []
+
     const docs = this.docIdsByHookId[subscription.hookId].map(
-      (id) => docsCache[id]
+      (id) => {
+        if (!docsCache[id]) idsMissing.push(id)
+        return docsCache[id]
+      }
     )
 
-    const hookIsFullyCached = !docs.some(
-      (doc) => doc === undefined
-    )
+    const hookIsFullyCached = idsMissing.length === 0
+
+    if (
+      !this.waitingForRegistrationsOn[collection.path] &&
+      !hookIsFullyCached
+    ) {
+      this.log(
+        collection.path,
+        "collection is missing ids",
+        idsMissing,
+        "resubscribing..."
+      )
+      this.resubscribe(collection.path)
+    }
 
     return {
       unregister,
@@ -212,6 +233,7 @@ export class CollectionService {
   }
 
   subscribe(collectionPath: string) {
+    this.waitingForRegistrationsOn[collectionPath] = false
     const allIds = new Set<string>()
 
     const collectionSubscriptions =
