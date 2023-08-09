@@ -36,6 +36,7 @@ import { useHookId } from "./useHookId"
 export function useDoc<T extends { id: string }>(
   ref: DocumentReference | undefined
 ) {
+  const subscribedIdRef = useRef(ref?.id)
   const [doc, setDoc] = useState<T | undefined>()
   const hookId = useHookId(ref ?? "useDoc")
   const service = useCollectionService("useDoc")
@@ -87,9 +88,13 @@ export function useDoc<T extends { id: string }>(
       return
     }
 
+    if (subscribedIdRef.current === ref.id) return
+
     log("doc id for", hookId, "changed to", ref.id)
     setDoc(undefined)
     service.updateDocIds(ref.parent.path, hookId, [ref.id])
+
+    subscribedIdRef.current = ref.id
   }, [ref?.parent.path, ref?.id])
 
   async function update(updates: Partial<T>) {

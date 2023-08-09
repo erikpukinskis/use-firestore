@@ -197,13 +197,26 @@ export class CollectionService {
       setTimeout(() => this.subscribe(collection.path))
     }
 
+    const idsMissing: string[] = []
+
     const docs = this.docIdsByHookId[subscription.hookId].map(
-      (id) => docsCache[id]
+      (id) => {
+        if (!docsCache[id]) idsMissing.push(id)
+        return docsCache[id]
+      }
     )
 
-    const hookIsFullyCached = !docs.some(
-      (doc) => doc === undefined
-    )
+    const hookIsFullyCached = idsMissing.length === 0
+
+    if (!hookIsFullyCached) {
+      this.log(
+        collection.path,
+        "collection is missing ids",
+        idsMissing,
+        "...resubscribing..."
+      )
+      this.resubscribe(collection.path)
+    }
 
     return {
       unregister,
