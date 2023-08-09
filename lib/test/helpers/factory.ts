@@ -7,6 +7,35 @@ import {
   getFirestore,
 } from "firebase/firestore"
 
+export type User = {
+  id: string
+  name: string
+}
+
+let userCount = 0
+
+export async function setUpUser(
+  app: FirebaseApp,
+  overrides: Partial<User> = {}
+) {
+  const properties = {
+    name: `Person ${++userCount}`,
+    ...overrides,
+  }
+
+  const ref = await addDoc(
+    collection(getFirestore(app), "owner"),
+    properties
+  )
+
+  const user = {
+    id: ref.id,
+    ...properties,
+  } as User
+
+  return { user }
+}
+
 export type Tag = {
   id: string
   text: string
@@ -19,10 +48,8 @@ export async function setUpTag(
   app: FirebaseApp,
   overrides: Partial<Tag> = {}
 ) {
-  tagCount++
-
   const properties = {
-    text: `Tag No.${tagCount}`,
+    text: `Tag No.${++tagCount}`,
     color: "green",
     ...overrides,
   }
@@ -55,11 +82,14 @@ export async function setUpRepo(
   app: FirebaseApp,
   overrides: Omit<Partial<Repo>, "id"> = {}
 ) {
-  const uniqueId = ++repoCount
+  const slug = overrides.slug ?? `repo-${++repoCount}`
 
-  const slug = overrides.slug ?? `repo-${uniqueId}`
+  let ownerId = overrides.ownerId
 
-  const ownerId = overrides.ownerId ?? `owner-${uniqueId}`
+  if (!ownerId) {
+    const { user } = await setUpUser(app)
+    ownerId = user.id
+  }
 
   const properties = {
     ownerId,

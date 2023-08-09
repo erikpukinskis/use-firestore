@@ -32,8 +32,8 @@ export function DocsProvider({
   debug = false,
 }: DocsProviderProps) {
   useEffect(() => {
-    // if (!debug) return
-    // addGapsToConsoleLog()
+    if (!debug) return
+    addGapsToConsoleLog()
   }, [])
 
   const [services] = useState(() => ({
@@ -87,7 +87,7 @@ function addGapsToConsoleLog() {
   const originalLog = console.log
   let gapTimeout: NodeJS.Timer | null = null
   function mindTheGap() {
-    originalLog("\n\n\n-------------------\n\n\n\n")
+    originalLog("\n\n\n\n\n\n")
   }
   const newLog: typeof console.log = (...args) => {
     originalLog(...args)
