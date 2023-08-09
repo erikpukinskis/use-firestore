@@ -32,8 +32,8 @@ export function DocsProvider({
   debug = false,
 }: DocsProviderProps) {
   useEffect(() => {
-    if (!debug) return
-    addGapsToConsoleLog()
+    // if (!debug) return
+    // addGapsToConsoleLog()
   }, [])
 
   const [services] = useState(() => ({
