@@ -122,7 +122,9 @@ export function useDocs<T extends { id: string }>(
   collection: CollectionReference,
   ids: string[]
 ) {
-  const [docs, setDocs] = useState<T[] | undefined>()
+  const [docs, setDocs] = useState<T[] | undefined>(() => {
+    return ids.length < 1 ? [] : undefined
+  })
   const hookId = useHookId(collection, ids)
   const service = useCollectionService("useDoc")
   const firstRenderRef = useRef(true)
@@ -148,18 +150,20 @@ export function useDocs<T extends { id: string }>(
       }
     )
 
-    if (cachedDocs) setDocs(cachedDocs as unknown as T[])
+    if (cachedDocs) {
+      setDocs(cachedDocs as unknown as T[])
+    }
 
     return unregister
   }, [collection.path])
 
   useEffect(() => {
-    setDocs(ids.length < 1 ? [] : undefined)
-
     if (firstRenderRef.current) {
       firstRenderRef.current = false
       return
     }
+
+    setDocs(ids.length < 1 ? [] : undefined)
 
     service.updateDocIds(collection.path, hookId, ids)
   }, [ids.join()])
