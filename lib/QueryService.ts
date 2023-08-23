@@ -117,10 +117,13 @@ export class QueryService {
           const docs: CachedDocument[] = []
 
           this.log(
+            "query",
             queryKey,
-            "snapshot with",
+            "received snapshot with",
             querySnapshot.size,
-            "docs"
+            "docs for",
+            this.queryListenersByKey[queryKey].length,
+            "listeners"
           )
 
           querySnapshot.forEach((docSnapshot) => {

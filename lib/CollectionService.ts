@@ -274,7 +274,9 @@ export class CollectionService {
     )
 
     this.log(
-      "subscribing to collection snapshots with query:",
+      "subscribing to",
+      collectionPath,
+      "collection snapshots with query:",
       serializeQuery(q),
       "there are",
       collectionSubscriptions.length,

@@ -112,6 +112,14 @@ export function useDoc<T extends { id: string }>(
       return { ...doc, ...updates }
     })
 
+    log(
+      "updating",
+      ref.path,
+      "fields:",
+      Object.keys(updates).join(", "),
+      "..."
+    )
+
     await updateDoc(ref, updates as DocumentData)
   }
 
