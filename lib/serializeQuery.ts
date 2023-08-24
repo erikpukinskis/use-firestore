@@ -69,6 +69,12 @@ export function serializeQuery(query: Query<DocumentData>) {
   }
 }
 
+export function getQueryPath(query: Query<DocumentData>) {
+  const { _query } = query as Firestore3Query
+
+  return _query.path.segments.join("/")
+}
+
 /**
  * Serialize a single Firebase filter. Returns something like:
  *

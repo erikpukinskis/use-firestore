@@ -1,24 +1,12 @@
-import {
-  documentId,
-  onSnapshot,
-  query,
-  where,
-} from "firebase/firestore"
 import type {
   CollectionReference,
   DocumentData,
+  QuerySnapshot,
 } from "firebase/firestore"
-import intersect from "./intersect"
-import { serializeQuery } from "./serializeQuery"
+import { ChunkedSnapshotListener } from "./ChunkedSnapshotListener"
+import { intersect } from "./helpers"
 
 type CachedDocument = DocumentData & { id: string }
-
-// type CollectionState =
-//   | "offline"
-//   | "waiting-to-subscribe"
-//   | "waiting-for-snapshot"
-//   | "up-to-date"
-//   | "waiting-to-re-subscribe"
 
 export const UNSUBSCRIBE_DELAY = 100
 
@@ -49,10 +37,11 @@ type CollectionSubscription = {
 export class CollectionService {
   debug: boolean
 
-  unsubscribeFunctionsByCollectionPath: Record<
+  snapshotListenersByCollectionPath: Record<
     string,
-    () => void
+    ChunkedSnapshotListener
   > = {}
+
   subscriptionsByCollectionPath: Record<
     string,
     CollectionSubscription[]
@@ -67,7 +56,6 @@ export class CollectionService {
     string,
     CollectionReference
   > = {}
-  waitingForRegistrationsOn: Record<string, boolean> = {}
 
   constructor(debug: boolean) {
     this.debug = debug
@@ -86,9 +74,8 @@ export class CollectionService {
   ) {
     this.collectionReferencesByPath[collection.path] = collection
 
-    const hasOwner = Boolean(
-      this.unsubscribeFunctionsByCollectionPath[collection.path]
-    )
+    const existingListener =
+      this.snapshotListenersByCollectionPath[collection.path]
 
     // First we make sure some data structures are present for this collection
     let collectionSubscriptions =
@@ -118,9 +105,9 @@ export class CollectionService {
     collectionSubscriptions.push(subscription)
 
     this.log(
-      "registering",
+      "Registering",
       hookId,
-      hasOwner
+      existingListener
         ? `⇒ has owner (${collectionSubscriptions.length} listeners)`
         : "⇒ subscribing..."
     )
@@ -138,7 +125,7 @@ export class CollectionService {
      * there is one available or otherwise unsubscribe from snapshots.
      */
     const unregister = () => {
-      this.log("unregistering hook", hookId)
+      this.log("Unregistering hook", hookId)
 
       const index = collectionSubscriptions.findIndex(
         (subscription) => subscription.hookId === hookId
@@ -156,7 +143,7 @@ export class CollectionService {
       // If there's still another hook listening to this collection, we're done
       if (collectionSubscriptions.length > 0) {
         this.log(
-          "collection",
+          "Collection",
           collection.path,
           "still has",
           collectionSubscriptions.length,
@@ -166,65 +153,61 @@ export class CollectionService {
       }
 
       // Else shut it down
-      const unsubscribeFromSnapshots =
-        this.unsubscribeFunctionsByCollectionPath[
-          collection.path
-        ]
+      const listener =
+        this.snapshotListenersByCollectionPath[collection.path]
 
-      if (!unsubscribeFromSnapshots) {
+      if (!listener) {
         throw new Error(
           `No unsubscribe function found for collection ${collection.path} even though ${hookId} was subscribed?`
         )
       }
 
-      delete this.unsubscribeFunctionsByCollectionPath[
+      delete this.snapshotListenersByCollectionPath[
         collection.path
       ]
 
-      unsubscribeFromSnapshots()
+      listener.shutDown()
 
-      this.log("unsubscribed from", collection.path)
+      this.log("Unsubscribed from", collection.path)
     }
 
-    if (!hasOwner) {
-      this.unsubscribeFunctionsByCollectionPath[
-        collection.path
-      ] = noop
+    // End of sub-routines, final steps of .register method:
+
+    if (existingListener) {
+      existingListener.addIds(ids)
+    } else {
+      const listener = new ChunkedSnapshotListener(
+        this.debug,
+        collection,
+        ids,
+        (snapshot) => {
+          this.handleSnapshot(collection.path, snapshot)
+        }
+      )
+
+      this.snapshotListenersByCollectionPath[collection.path] =
+        listener
+
       this.log(
-        "waiting to see if other hooks will register",
+        "Waiting to see if other hooks will register",
         collection.path,
         "ids..."
       )
-      this.waitingForRegistrationsOn[collection.path] = true
+
       setTimeout(() => {
         this.log("Done waiting for", collection.path, "ids.")
-        this.subscribe(collection.path)
-      })
+        listener.start()
+      }, 1)
     }
 
     const idsMissing: string[] = []
 
-    const docs = this.docIdsByHookId[subscription.hookId].map(
-      (id) => {
-        if (!docsCache[id]) idsMissing.push(id)
-        return docsCache[id]
-      }
-    )
+    const docs = ids.map((id) => {
+      if (!docsCache[id]) idsMissing.push(id)
+      return docsCache[id]
+    })
 
     const hookIsFullyCached = idsMissing.length === 0
-
-    if (
-      !this.waitingForRegistrationsOn[collection.path] &&
-      !hookIsFullyCached
-    ) {
-      this.log(
-        collection.path,
-        "collection is missing ids",
-        idsMissing,
-        "resubscribing..."
-      )
-      this.resubscribe(collection.path)
-    }
 
     return {
       unregister,
@@ -232,137 +215,101 @@ export class CollectionService {
     }
   }
 
-  subscribe(collectionPath: string) {
-    this.waitingForRegistrationsOn[collectionPath] = false
-    const allIds = new Set<string>()
-
-    const collectionSubscriptions =
-      this.subscriptionsByCollectionPath[collectionPath]
+  handleSnapshot(
+    collectionPath: string,
+    querySnapshot: QuerySnapshot
+  ) {
+    const dirtyIds: string[] = []
 
     const docsCache =
       this.docsCacheByCollectionPath[collectionPath]
 
-    for (const subscription of collectionSubscriptions) {
-      for (const id of this.docIdsByHookId[
-        subscription.hookId
-      ]) {
-        allIds.add(id)
+    this.log(
+      "Snapshot on",
+      collectionPath,
+      "with",
+      querySnapshot.size,
+      "docs"
+    )
+
+    for (const change of querySnapshot.docChanges()) {
+      switch (change.type) {
+        case "added": // We get "added" changes in the very first snapshot
+        case "modified": {
+          const doc: CachedDocument = {
+            id: change.doc.id,
+            ...change.doc.data(),
+          }
+
+          docsCache[change.doc.id] = doc
+
+          dirtyIds.push(change.doc.id)
+          break
+        }
+        case "removed": {
+          // Means a doc got deleted. Probably need to send an undefined
+          // if any docs are deleted
+          delete docsCache[change.doc.id]
+          break
+        }
       }
     }
 
-    this.subscribedIdsByPath[collectionPath] = [...allIds]
+    const collectionSubscriptions =
+      this.subscriptionsByCollectionPath[collectionPath]
 
-    if (this.subscribedIdsByPath[collectionPath].length < 1) {
-      this.log(
-        "collection",
-        collectionPath,
-        "has no documents to query, skipping."
-      )
-      this.unsubscribeFunctionsByCollectionPath[collectionPath] =
-        noop
+    for (const subscription of collectionSubscriptions) {
+      const dirtyIdsForHook = intersect([
+        dirtyIds,
+        this.docIdsByHookId[subscription.hookId],
+      ])
 
-      return
-    }
-
-    const q = query(
-      this.collectionReferencesByPath[collectionPath],
-      where(
-        documentId(),
-        "in",
-        this.subscribedIdsByPath[collectionPath]
-      )
-    )
-
-    this.log(
-      "subscribing to",
-      collectionPath,
-      "collection snapshots with query:",
-      serializeQuery(q),
-      "there are",
-      collectionSubscriptions.length,
-      "subscriptions"
-    )
-
-    const unsubscribeFromSnapshots = onSnapshot(
-      q,
-      (querySnapshot) => {
-        const dirtyIds: string[] = []
-
+      if (dirtyIdsForHook.length === 0) {
         this.log(
-          collectionPath,
-          "snapshot with",
-          querySnapshot.size,
-          "docs"
+          "Hook",
+          subscription.hookId,
+          "does not need to be notified"
         )
 
-        for (const change of querySnapshot.docChanges()) {
-          switch (change.type) {
-            case "added": // We get "added" changes in the very first snapshot
-            case "modified": {
-              const doc: CachedDocument = {
-                id: change.doc.id,
-                ...change.doc.data(),
-              }
-
-              docsCache[change.doc.id] = doc
-
-              dirtyIds.push(change.doc.id)
-              break
-            }
-            case "removed": {
-              // Means a doc got deleted. Probably need to send an undefined
-              // if any docs are deleted
-              delete docsCache[change.doc.id]
-              break
-            }
-          }
-        }
-
-        for (const subscription of collectionSubscriptions) {
-          const dirtyIdsForHook = intersect([
-            dirtyIds,
-            this.docIdsByHookId[subscription.hookId],
-          ])
-
-          if (dirtyIdsForHook.length === 0) {
-            this.log(
-              subscription.hookId,
-              "does not need to be notified"
-            )
-
-            continue
-          }
-
-          const missingIds = this.docIdsByHookId[
-            subscription.hookId
-          ].filter((id) => !docsCache[id])
-
-          if (missingIds.length > 0) {
-            this.log(
-              subscription.hookId,
-              "still waiting on ids",
-              missingIds
-            )
-            subscription.onDocs(undefined)
-          } else {
-            this.log(
-              "notifying",
-              subscription.hookId,
-              "of new docs, it wants",
-              this.docIdsByHookId[subscription.hookId]
-            )
-            const docs = this.docIdsByHookId[
-              subscription.hookId
-            ].map((id) => docsCache[id])
-
-            subscription.onDocs(docs)
-          }
-        }
+        continue
       }
-    )
 
-    this.unsubscribeFunctionsByCollectionPath[collectionPath] =
-      unsubscribeFromSnapshots
+      const missingIds = this.docIdsByHookId[
+        subscription.hookId
+      ].filter((id) => !docsCache[id])
+
+      this.log(
+        "Collecting documents for",
+        subscription.hookId,
+        "ids",
+        this.docIdsByHookId[subscription.hookId],
+        "...",
+        missingIds,
+        "are missing"
+      )
+
+      if (missingIds.length > 0) {
+        this.log(
+          "Hook",
+          subscription.hookId,
+          "is still waiting on ids",
+          missingIds
+        )
+        subscription.onDocs(undefined)
+      } else {
+        this.log(
+          "Notifying",
+          subscription.hookId,
+          "of new docs, it wants",
+          this.docIdsByHookId[subscription.hookId]
+        )
+        const docs = this.docIdsByHookId[
+          subscription.hookId
+        ].map((id) => docsCache[id])
+
+        subscription.onDocs(docs)
+      }
+    }
   }
 
   updateDocIds(
@@ -381,7 +328,7 @@ export class CollectionService {
     const someDocsUncached = ids.some((id) => !docCache[id])
 
     this.log(
-      "updated ids for",
+      "Updated ids for",
       hookId,
       "to",
       ids,
@@ -390,43 +337,26 @@ export class CollectionService {
         : "all docs cached"
     )
 
+    this.snapshotListenersByCollectionPath[
+      collectionPath
+    ].addIds(ids)
+
     if (someDocsUncached) {
-      this.resubscribe(collectionPath)
-    } else {
-      const subscription = collectionSubscriptions.find(
-        (subscription) => subscription.hookId === hookId
-      )
-
-      if (!subscription) {
-        throw new Error(
-          `Cannot notify ${hookId} about its updated docs because no subscription was found`
-        )
-      }
-
-      subscription.onDocs(ids.map((id) => docCache[id]))
-    }
-  }
-
-  resubscribe(collectionPath: string) {
-    const unsubscribe =
-      this.unsubscribeFunctionsByCollectionPath[collectionPath]
-
-    if (!unsubscribe) {
-      throw new Error(
-        "Can't resubscribe when we're not already subcribed?"
-      )
+      return
     }
 
-    unsubscribe()
-
-    this.log(
-      `temporarily unsubscribed from ${collectionPath}, resubscribing...`
+    const subscription = collectionSubscriptions.find(
+      (subscription) => subscription.hookId === hookId
     )
 
-    this.subscribe(collectionPath)
-  }
-}
+    if (!subscription) {
+      throw new Error(
+        `Cannot notify ${hookId} about its updated docs because no subscription was found`
+      )
+    }
 
-function noop() {
-  return
+    const docs = ids.map((id) => docCache[id])
+
+    subscription.onDocs(docs)
+  }
 }

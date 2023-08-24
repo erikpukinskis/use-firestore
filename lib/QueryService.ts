@@ -63,7 +63,7 @@ export class QueryService {
     const hasOwner = Boolean(this.ownerByQueryKey[queryKey])
 
     this.log(
-      "registering",
+      "Registering",
       hookId,
       hasOwner ? "⇒ has owner" : "⇒ subscribing..."
     )
@@ -108,7 +108,7 @@ export class QueryService {
      * If no one else is subscribed to this query yet, we'll do it
      */
     const subscribe = () => {
-      this.log("subscribing to query", queryKey)
+      this.log("Subscribing to query", queryKey)
       this.ownerByQueryKey[queryKey] = hookId
 
       const unsubscribeFromQuery = onSnapshot(
@@ -117,7 +117,7 @@ export class QueryService {
           const docs: CachedDocument[] = []
 
           this.log(
-            "query",
+            "Query",
             queryKey,
             "received snapshot with",
             querySnapshot.size,
@@ -156,7 +156,7 @@ export class QueryService {
      * there is one available or otherwise unsubscribe from snapshots.
      */
     const unsubscribe = () => {
-      this.log(hookId, "is unsubscribing from", queryKey)
+      this.log("Hook", hookId, "is unsubscribing from", queryKey)
       // Some other hook is the owner of this query key, there's nothing for us
       // to unsubscribe
       if (this.ownerByQueryKey[queryKey] !== hookId) {
@@ -233,7 +233,7 @@ export class QueryService {
       assignQueryOwnerFunctions.splice(index, 1)
 
       this.log(
-        "now there are",
+        "Now there are",
         assignQueryOwnerFunctions.length,
         "available owners"
       )
@@ -250,6 +250,7 @@ export class QueryService {
       // lots of connections open.
       if (this.ownerByQueryKey[queryKey] === hookId) {
         this.log(
+          "Hook",
           hookId,
           "is unregistering and may unsubscribe in",
           `${UNSUBSCRIBE_DELAY}ms...`
@@ -260,6 +261,7 @@ export class QueryService {
         setTimeout(unsubscribe, UNSUBSCRIBE_DELAY)
       } else {
         this.log(
+          "Hook",
           hookId,
           "is unregistering and it is not the owner,",
           this.ownerByQueryKey[queryKey],

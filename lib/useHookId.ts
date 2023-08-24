@@ -5,7 +5,7 @@ import type {
 } from "firebase/firestore"
 import { useState } from "react"
 import { useQueryService } from "./DocsProvider"
-import { serializeQuery } from "./serializeQuery"
+import { getQueryPath, serializeQuery } from "./serializeQuery"
 
 let hookCount = 0
 
@@ -25,6 +25,9 @@ const IGNORE_FUNCTIONS = [
   "renderWithHooks",
   "useState",
   "Object.useState",
+  "mountIndeterminateComponent",
+  "Module.useHookId",
+  "Proxy.useState",
 ]
 
 /**
@@ -73,15 +76,24 @@ export function useHookId(
       loc = functionNames?.join(">")
     }
 
+    const path =
+      typeof context === "string"
+        ? ""
+        : isCollectionReference(context)
+        ? context.path
+        : isDocumentReference(context)
+        ? context.path
+        : getQueryPath(context)
+
     if (loc) {
       if (typeof context === "string") {
         return `${context}@${loc} #${++hookCount}`
       } else if (isDocumentReference(context)) {
-        return `useDoc@${loc} #${++hookCount}`
+        return `${loc}(${path}) #${++hookCount}`
       } else if (isCollectionReference(context)) {
-        return `useDocs@${loc} #${++hookCount}`
+        return `${loc}(${path}) #${++hookCount}`
       } else {
-        return `useQuery@${loc} #${++hookCount}`
+        return `${loc}(${path}) #${++hookCount}`
       }
     }
 

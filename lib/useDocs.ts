@@ -113,7 +113,7 @@ export function useDoc<T extends { id: string }>(
     })
 
     log(
-      "updating",
+      "Updating",
       ref.path,
       "fields:",
       Object.keys(updates).join(", "),
@@ -154,6 +154,7 @@ export function useDocs<T extends { id: string }>(
       ids,
       (docs) => {
         if (!mountedRef.current) return
+
         setDocs(docs as unknown as T[])
       }
     )
