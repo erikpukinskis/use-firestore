@@ -179,7 +179,9 @@ describe("useDocs", () => {
     const { getAllByRole } = render(
       <ListRepos ownerId={repo1.ownerId} />,
       {
-        wrapper: DocsProvider,
+        wrapper: ({ children }) => (
+          <DocsProvider testEnv>{children}</DocsProvider>
+        ),
       }
     )
 
@@ -207,7 +209,9 @@ describe("useDocs", () => {
     const { getAllByRole, getByText } = render(
       <ListRepos ownerId={repo.ownerId} />,
       {
-        wrapper: DocsProvider,
+        wrapper: ({ children }) => (
+          <DocsProvider testEnv>{children}</DocsProvider>
+        ),
       }
     )
 

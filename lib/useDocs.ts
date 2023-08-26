@@ -112,6 +112,14 @@ export function useDoc<T extends { id: string }>(
       return { ...doc, ...updates }
     })
 
+    log(
+      "Updating",
+      ref.path,
+      "fields:",
+      Object.keys(updates).join(", "),
+      "..."
+    )
+
     await updateDoc(ref, updates as DocumentData)
   }
 
@@ -120,10 +128,10 @@ export function useDoc<T extends { id: string }>(
 
 export function useDocs<T extends { id: string }>(
   collection: CollectionReference,
-  ids: string[]
+  ids: string[] | undefined
 ) {
   const [docs, setDocs] = useState<T[] | undefined>(() => {
-    return ids.length < 1 ? [] : undefined
+    return !ids || ids.length < 1 ? [] : undefined
   })
   const hookId = useHookId(collection, ids)
   const service = useCollectionService("useDoc")
@@ -137,36 +145,44 @@ export function useDocs<T extends { id: string }>(
     []
   )
 
-  useEffect(() => {
-    setDocs(ids.length < 1 ? [] : undefined)
+  useEffect(
+    function registerHook() {
+      setDocs(!ids || ids.length < 1 ? [] : undefined)
 
-    const { unregister, cachedDocs } = service.registerDocsHook(
-      hookId,
-      collection,
-      ids,
-      (docs) => {
-        if (!mountedRef.current) return
-        setDocs(docs as unknown as T[])
+      const { unregister, cachedDocs } =
+        service.registerDocsHook(
+          hookId,
+          collection,
+          ids ?? [],
+          (docs) => {
+            if (!mountedRef.current) return
+
+            setDocs(docs as unknown as T[])
+          }
+        )
+
+      if (cachedDocs) {
+        setDocs(cachedDocs as unknown as T[])
       }
-    )
 
-    if (cachedDocs) {
-      setDocs(cachedDocs as unknown as T[])
-    }
+      return unregister
+    },
+    [collection.path]
+  )
 
-    return unregister
-  }, [collection.path])
+  useEffect(
+    function updateDocIds() {
+      if (firstRenderRef.current) {
+        firstRenderRef.current = false
+        return
+      }
 
-  useEffect(() => {
-    if (firstRenderRef.current) {
-      firstRenderRef.current = false
-      return
-    }
+      setDocs(!ids || ids.length < 1 ? [] : undefined)
 
-    setDocs(ids.length < 1 ? [] : undefined)
-
-    service.updateDocIds(collection.path, hookId, ids)
-  }, [ids.join()])
+      service.updateDocIds(collection.path, hookId, ids ?? [])
+    },
+    [ids?.join()]
+  )
 
   return docs
 }

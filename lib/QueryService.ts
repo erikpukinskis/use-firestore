@@ -1,4 +1,8 @@
-import type { DocumentData, Query } from "firebase/firestore"
+import type {
+  DocumentData,
+  Query,
+  QuerySnapshot,
+} from "firebase/firestore"
 import { onSnapshot } from "firebase/firestore"
 import { serializeQuery } from "./serializeQuery"
 
@@ -29,6 +33,7 @@ function red(text: string) {
  */
 export class QueryService {
   debug: boolean
+  testEnv: boolean
 
   // For queries...
   ownerByQueryKey: Record<string, string> = {}
@@ -44,8 +49,9 @@ export class QueryService {
     Array<() => void>
   > = {}
 
-  constructor(debug: boolean) {
+  constructor(debug: boolean, testEnv: boolean) {
     this.debug = debug
+    this.testEnv = testEnv
   }
 
   log(...args: Parameters<typeof console.log>) {
@@ -63,7 +69,7 @@ export class QueryService {
     const hasOwner = Boolean(this.ownerByQueryKey[queryKey])
 
     this.log(
-      "registering",
+      "Registering",
       hookId,
       hasOwner ? "⇒ has owner" : "⇒ subscribing..."
     )
@@ -108,41 +114,66 @@ export class QueryService {
      * If no one else is subscribed to this query yet, we'll do it
      */
     const subscribe = () => {
-      this.log("subscribing to query", queryKey)
+      this.log("Subscribing to query", queryKey)
       this.ownerByQueryKey[queryKey] = hookId
 
-      const unsubscribeFromQuery = onSnapshot(
-        q,
-        (querySnapshot) => {
-          const docs: CachedDocument[] = []
-
+      const handleSnapshot = (querySnapshot: QuerySnapshot) => {
+        if (querySnapshot.metadata.fromCache) {
           this.log(
+            "Query",
             queryKey,
-            "snapshot with",
+            "returned",
             querySnapshot.size,
-            "docs"
+            "cached docs; ignoring."
           )
-
-          querySnapshot.forEach((docSnapshot) => {
-            const path = docSnapshot.ref.path
-            const doc = {
-              id: docSnapshot.id,
-              __path: path,
-              ...docSnapshot.data(),
-            }
-
-            docs.push(doc)
-          })
-
-          this.lastQueryResultByKey[queryKey] = docs
-
-          for (const listener of this.queryListenersByKey[
-            queryKey
-          ]) {
-            listener(docs)
-          }
+          return
         }
-      )
+
+        const docs: CachedDocument[] = []
+
+        this.log(
+          "Query",
+          queryKey,
+          "received snapshot with",
+          querySnapshot.size,
+          "docs for",
+          this.queryListenersByKey[queryKey].length,
+          "listeners",
+          querySnapshot.metadata
+        )
+
+        querySnapshot.forEach((docSnapshot) => {
+          const path = docSnapshot.ref.path
+          const doc = {
+            id: docSnapshot.id,
+            __path: path,
+            ...docSnapshot.data(),
+          }
+
+          docs.push(doc)
+        })
+
+        this.lastQueryResultByKey[queryKey] = docs
+
+        for (const listener of this.queryListenersByKey[
+          queryKey
+        ]) {
+          listener(docs)
+        }
+      }
+
+      // For some reason, the onSnapshot overload with three args (middle one
+      // indicating to include metadata changes) doesn't return any snapshots in
+      // the test environment. It works fine in the browser. Passing {
+      // includeMetadataChanges: undefined } also doesn't work. Smells like a
+      // Firestore bug, but merits more investigation...
+      const unsubscribeFromQuery = this.testEnv
+        ? onSnapshot(q, handleSnapshot)
+        : onSnapshot(
+            q,
+            { includeMetadataChanges: true },
+            handleSnapshot
+          )
 
       this.unsubscribeFunctionsByQueryKey[queryKey] =
         unsubscribeFromQuery
@@ -153,7 +184,7 @@ export class QueryService {
      * there is one available or otherwise unsubscribe from snapshots.
      */
     const unsubscribe = () => {
-      this.log(hookId, "is unsubscribing from", queryKey)
+      this.log("Hook", hookId, "is unsubscribing from", queryKey)
       // Some other hook is the owner of this query key, there's nothing for us
       // to unsubscribe
       if (this.ownerByQueryKey[queryKey] !== hookId) {
@@ -230,7 +261,7 @@ export class QueryService {
       assignQueryOwnerFunctions.splice(index, 1)
 
       this.log(
-        "now there are",
+        "Now there are",
         assignQueryOwnerFunctions.length,
         "available owners"
       )
@@ -247,6 +278,7 @@ export class QueryService {
       // lots of connections open.
       if (this.ownerByQueryKey[queryKey] === hookId) {
         this.log(
+          "Hook",
           hookId,
           "is unregistering and may unsubscribe in",
           `${UNSUBSCRIBE_DELAY}ms...`
@@ -257,6 +289,7 @@ export class QueryService {
         setTimeout(unsubscribe, UNSUBSCRIBE_DELAY)
       } else {
         this.log(
+          "Hook",
           hookId,
           "is unregistering and it is not the owner,",
           this.ownerByQueryKey[queryKey],
