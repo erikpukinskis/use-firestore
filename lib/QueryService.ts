@@ -1,4 +1,8 @@
-import type { DocumentData, Query } from "firebase/firestore"
+import type {
+  DocumentData,
+  Query,
+  QuerySnapshot,
+} from "firebase/firestore"
 import { onSnapshot } from "firebase/firestore"
 import { serializeQuery } from "./serializeQuery"
 
@@ -29,6 +33,7 @@ function red(text: string) {
  */
 export class QueryService {
   debug: boolean
+  testEnv: boolean
 
   // For queries...
   ownerByQueryKey: Record<string, string> = {}
@@ -44,8 +49,9 @@ export class QueryService {
     Array<() => void>
   > = {}
 
-  constructor(debug: boolean) {
+  constructor(debug: boolean, testEnv: boolean) {
     this.debug = debug
+    this.testEnv = testEnv
   }
 
   log(...args: Parameters<typeof console.log>) {
@@ -111,53 +117,65 @@ export class QueryService {
       this.log("Subscribing to query", queryKey)
       this.ownerByQueryKey[queryKey] = hookId
 
-      const unsubscribeFromQuery = onSnapshot(
-        q,
-        (querySnapshot) => {
-          if (querySnapshot.metadata.fromCache) {
-            this.log(
-              "Query",
-              queryKey,
-              "returned",
-              querySnapshot.size,
-              "cached docs; ignoring."
-            )
-            return
-          }
-
-          const docs: CachedDocument[] = []
-
+      const handleSnapshot = (querySnapshot: QuerySnapshot) => {
+        if (querySnapshot.metadata.fromCache) {
           this.log(
             "Query",
             queryKey,
-            "received snapshot with",
+            "returned",
             querySnapshot.size,
-            "docs for",
-            this.queryListenersByKey[queryKey].length,
-            "listeners",
-            querySnapshot.metadata
+            "cached docs; ignoring."
           )
-
-          querySnapshot.forEach((docSnapshot) => {
-            const path = docSnapshot.ref.path
-            const doc = {
-              id: docSnapshot.id,
-              __path: path,
-              ...docSnapshot.data(),
-            }
-
-            docs.push(doc)
-          })
-
-          this.lastQueryResultByKey[queryKey] = docs
-
-          for (const listener of this.queryListenersByKey[
-            queryKey
-          ]) {
-            listener(docs)
-          }
+          return
         }
-      )
+
+        const docs: CachedDocument[] = []
+
+        this.log(
+          "Query",
+          queryKey,
+          "received snapshot with",
+          querySnapshot.size,
+          "docs for",
+          this.queryListenersByKey[queryKey].length,
+          "listeners",
+          querySnapshot.metadata
+        )
+
+        querySnapshot.forEach((docSnapshot) => {
+          const path = docSnapshot.ref.path
+          const doc = {
+            id: docSnapshot.id,
+            __path: path,
+            ...docSnapshot.data(),
+          }
+
+          docs.push(doc)
+        })
+
+        this.lastQueryResultByKey[queryKey] = docs
+
+        for (const listener of this.queryListenersByKey[
+          queryKey
+        ]) {
+          listener(docs)
+        }
+      }
+
+      console.log("test env?", this.testEnv)
+
+      // For some reason, the onSnapshot overload with three args (middle one
+      // indicating to include metadata changes) doesn't return any snapshots in
+      // the test environment. It works fine in the browser. Passing {
+      // includeMetadataChanges: undefined } also doesn't work. Smells like a
+      // Firestore bug, but merits more investigation...
+      const unsubscribeFromQuery = this.testEnv
+        ? onSnapshot(q, handleSnapshot)
+        : onSnapshot(
+            q,
+            { includeMetadataChanges: true },
+            handleSnapshot
+          )
 
       this.unsubscribeFunctionsByQueryKey[queryKey] =
         unsubscribeFromQuery

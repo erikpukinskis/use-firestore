@@ -25,11 +25,13 @@ const DocsContext = createContext<SubscriptionServices>(
 type DocsProviderProps = {
   children: React.ReactNode
   debug?: boolean
+  testEnv?: boolean
 }
 
 export function DocsProvider({
   children,
   debug = false,
+  testEnv = false,
 }: DocsProviderProps) {
   useEffect(() => {
     if (!debug) return
@@ -37,7 +39,7 @@ export function DocsProvider({
   }, [])
 
   const [services] = useState(() => ({
-    queryService: new QueryService(debug),
+    queryService: new QueryService(debug, testEnv),
     collectionService: new CollectionService(debug),
   }))
 
