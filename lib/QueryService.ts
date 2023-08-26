@@ -162,8 +162,6 @@ export class QueryService {
         }
       }
 
-      console.log("test env?", this.testEnv)
-
       // For some reason, the onSnapshot overload with three args (middle one
       // indicating to include metadata changes) doesn't return any snapshots in
       // the test environment. It works fine in the browser. Passing {
