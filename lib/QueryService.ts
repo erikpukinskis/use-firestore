@@ -113,9 +113,17 @@ export class QueryService {
 
       const unsubscribeFromQuery = onSnapshot(
         q,
-        { includeMetadataChanges: true },
         (querySnapshot) => {
-          if (querySnapshot.metadata.fromCache) return
+          if (querySnapshot.metadata.fromCache) {
+            this.log(
+              "Query",
+              queryKey,
+              "returned",
+              querySnapshot.size,
+              "cached docs; ignoring."
+            )
+            return
+          }
 
           const docs: CachedDocument[] = []
 
