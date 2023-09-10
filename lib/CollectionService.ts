@@ -324,7 +324,7 @@ export class CollectionService {
           "is still waiting on ids",
           missingIds
         )
-        subscription.onDocs(undefined)
+        // subscription.onDocs(undefined)
       } else {
         this.log(
           "Notifying",
