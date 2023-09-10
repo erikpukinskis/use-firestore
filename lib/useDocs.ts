@@ -43,6 +43,11 @@ export function useDoc<T extends { id: string }>(
   const firstRenderRef = useRef(true)
   const mountedRef = useRef(true)
   const log = useLog()
+  const [error, setError] = useState<Error | undefined>()
+
+  if (error) {
+    throw error
+  }
 
   useEffect(
     () => () => {
@@ -68,7 +73,8 @@ export function useDoc<T extends { id: string }>(
       ([doc]) => {
         if (!mountedRef.current) return
         setDoc(doc as unknown as T)
-      }
+      },
+      setError
     )
 
     if (cachedDocs) {
@@ -137,6 +143,11 @@ export function useDocs<T extends { id: string }>(
   const service = useCollectionService("useDoc")
   const firstRenderRef = useRef(true)
   const mountedRef = useRef(true)
+  const [error, setError] = useState<Error | undefined>()
+
+  if (error) {
+    throw error
+  }
 
   useEffect(
     () => () => {
@@ -158,7 +169,8 @@ export function useDocs<T extends { id: string }>(
             if (!mountedRef.current) return
 
             setDocs(docs as unknown as T[])
-          }
+          },
+          setError
         )
 
       if (cachedDocs) {

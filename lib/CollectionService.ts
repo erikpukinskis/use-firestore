@@ -17,7 +17,8 @@ function red(text: string) {
 type CollectionSubscription = {
   hookId: string
   collection: CollectionReference
-  onDocs(docs: CachedDocument[] | undefined): void
+  onDocs: (docs: CachedDocument[]) => void
+  onError: (error: Error) => void
 }
 
 /**
@@ -70,7 +71,8 @@ export class CollectionService {
     hookId: string,
     collection: CollectionReference,
     ids: string[],
-    onDocs: (docs: CachedDocument[]) => void
+    onDocs: (docs: CachedDocument[]) => void,
+    onError: (error: Error) => void
   ) {
     this.collectionReferencesByPath[collection.path] = collection
 
@@ -99,6 +101,7 @@ export class CollectionService {
     const subscription: CollectionSubscription = {
       hookId,
       onDocs,
+      onError,
       collection,
     }
 
@@ -283,11 +286,22 @@ export class CollectionService {
         )
 
         if (missingIds.length > 0 && listener.isLoaded) {
-          throw new Error(
-            `No document in collection ${collectionPath} with id(s) ${missingIds.join(
-              ","
-            )}`
+          this.log(
+            "No document in collection",
+            collectionPath,
+            "with id(s)",
+            missingIds
           )
+
+          subscription.onError(
+            new Error(
+              `No document in collection ${collectionPath} with id(s) ${missingIds.join(
+                ","
+              )}`
+            )
+          )
+
+          return
         }
 
         continue
