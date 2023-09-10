@@ -258,25 +258,40 @@ export class CollectionService {
     const collectionSubscriptions =
       this.subscriptionsByCollectionPath[collectionPath]
 
+    const listener =
+      this.snapshotListenersByCollectionPath[collectionPath]
+
     for (const subscription of collectionSubscriptions) {
       const dirtyIdsForHook = intersect([
         dirtyIds,
         this.docIdsByHookId[subscription.hookId],
       ])
 
+      const missingIds = this.docIdsByHookId[
+        subscription.hookId
+      ].filter((id) => !docsCache[id])
+
       if (dirtyIdsForHook.length === 0) {
         this.log(
           "Hook",
           subscription.hookId,
-          "does not need to be notified"
+          "does not need to be notified it is waiting for",
+          this.docIdsByHookId[subscription.hookId],
+          listener.isLoaded
+            ? "...listener is fully loaded"
+            : "...listener still waiting on chunks"
         )
+
+        if (missingIds.length > 0 && listener.isLoaded) {
+          throw new Error(
+            `No document in collection ${collectionPath} with id(s) ${missingIds.join(
+              ","
+            )}`
+          )
+        }
 
         continue
       }
-
-      const missingIds = this.docIdsByHookId[
-        subscription.hookId
-      ].filter((id) => !docsCache[id])
 
       this.log(
         "Collecting documents for",

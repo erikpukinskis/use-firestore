@@ -13,16 +13,33 @@ import { serializeQuery } from "./serializeQuery"
 function red(text: string) {
   return `\x1b[31m${text}\x1b[0m`
 }
+/**
+ * Alright! What to do when an id is not found...
+ *
+ * We _probably_ want to throw an error... maybe we can return `null` if we want
+ * to be more forgiving... Do we want to crash out on every data inconsistency?
+ *
+ * My initial instinct is that we want to crash out.
+ *
+ * Let's put that decision off for a second... Regardless of whether we throw an
+ * error or send a null we probably need to do the same processing. I think
+ * maybe we can just throw a loading flag on Subscriptions, and then also keep
+ * track of which snapshot listeners are loaded, and when all of the snapshot
+ * listeners are loaded for a given collection, we can fire off our Error or our
+ * nulls of whatever.
+ */
 
 export class ChunkedSnapshotListener {
   collectionRef: CollectionReference
   subscribedIds: string[] = []
   currentIds: string[]
   chunks: string[][] = []
+  chunkIsLoaded: boolean[] = []
   unsubscribes: (() => void)[] = []
   onSnapshot: (snapshot: QuerySnapshot) => void
   status: "waiting" | "started" | "stopped" = "waiting"
   debug: boolean
+  isLoaded = false
 
   constructor(
     debug: boolean,
@@ -70,7 +87,17 @@ export class ChunkedSnapshotListener {
         this.collectionRef,
         where(documentId(), "in", chunk)
       )
-      const unsubscribe = onSnapshot(q, this.onSnapshot)
+      const chunkIndex = this.chunks.length
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        this.chunkIsLoaded[chunkIndex] = true
+        if (
+          !this.isLoaded &&
+          this.chunkIsLoaded.every((isLoaded) => isLoaded)
+        ) {
+          this.isLoaded = true
+        }
+        this.onSnapshot(snapshot)
+      })
 
       this.log(
         "Subscribing to",
@@ -82,6 +109,7 @@ export class ChunkedSnapshotListener {
 
       this.chunks.push(chunk)
       this.unsubscribes.push(unsubscribe)
+      this.chunkIsLoaded.push(false)
     }
   }
 
