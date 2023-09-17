@@ -1,5 +1,13 @@
-import { cleanup, render, waitFor } from "@testing-library/react"
-import { renderHook } from "@testing-library/react-hooks"
+import {
+  cleanup,
+  fireEvent,
+  render,
+  waitFor,
+} from "@testing-library/react"
+import {
+  renderHook,
+  suppressErrorOutput,
+} from "@testing-library/react-hooks"
 import {
   collection,
   doc,
@@ -9,6 +17,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore"
+import React, { useState } from "react"
 import {
   describe,
   it,
@@ -232,4 +241,108 @@ describe("useDocs", () => {
 
     expect(onSnapshot).toHaveBeenCalledTimes(3)
   })
+
+  function DocsPlusOneMore({ ids }: { ids: string[] }) {
+    const docs = useDocs<Tag>(
+      collection(getFirestore(testApp), "tags"),
+      ids
+    )
+
+    if (!docs) return <div>Loading...</div>
+
+    return (
+      <ul>
+        {docs.map((doc) => (
+          <li key={doc.id}>{doc.text}</li>
+        ))}
+        <OneMore />
+      </ul>
+    )
+  }
+
+  function OneMore() {
+    const [ids, setIds] = useState<string[]>([])
+
+    const docs = useDocs<Tag>(
+      collection(getFirestore(testApp), "tags"),
+      ids
+    )
+
+    if (!docs) return <>Loading....</>
+
+    const addOneMore = () => {
+      setIds(["id-not-to-be-found"])
+    }
+
+    return (
+      <>
+        {ids.length === 0 ? (
+          <button onClick={addOneMore}>Add one more</button>
+        ) : (
+          <li>clicked!</li>
+        )}
+        {docs.map((doc) => (
+          <li key={doc.id}>{doc.text}</li>
+        ))}
+      </>
+    )
+  }
+
+  it.only("throws an error when docs are not found", async () => {
+    const ids: string[] = []
+
+    for (let i = 0; i < 30; i++) {
+      const { tag } = await setUpTag(testApp, {
+        text: `this ${i} will be found`,
+      })
+
+      ids.push(tag.id)
+    }
+
+    const result = render(<DocsPlusOneMore ids={ids} />, {
+      wrapper: ({ children }) => (
+        <DocsProvider>
+          <TestErrorBoundary>{children}</TestErrorBoundary>
+        </DocsProvider>
+      ),
+    })
+
+    await waitFor(() => {
+      expect(result.getAllByRole("listitem")).toHaveLength(30)
+    })
+
+    fireEvent.click(
+      result.getByRole("button", { name: "Add one more" })
+    )
+
+    const restoreConsole = suppressErrorOutput()
+
+    try {
+      await waitFor(() => {
+        result.getByText(
+          "Error: No document in collection tags with id(s) id-not-to-be-found"
+        )
+      })
+    } finally {
+      restoreConsole()
+    }
+  })
 })
+
+class TestErrorBoundary extends React.Component {
+  state: { error?: Error } = {}
+
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+
+  render() {
+    const { error } = this.state
+    const { children } = this.props
+
+    if (error) {
+      return <div>Error: {error.message}</div>
+    }
+    return children
+  }
+}
