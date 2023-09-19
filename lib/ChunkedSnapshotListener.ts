@@ -12,21 +12,6 @@ import { serializeQuery } from "./serializeQuery"
 function red(text: string) {
   return `\x1b[31m${text}\x1b[0m`
 }
-/**
- * Alright! What to do when an id is not found...
- *
- * We _probably_ want to throw an error... maybe we can return `null` if we want
- * to be more forgiving... Do we want to crash out on every data inconsistency?
- *
- * My initial instinct is that we want to crash out.
- *
- * Let's put that decision off for a second... Regardless of whether we throw an
- * error or send a null we probably need to do the same processing. I think
- * maybe we can just throw a loading flag on Subscriptions, and then also keep
- * track of which snapshot listeners are loaded, and when all of the snapshot
- * listeners are loaded for a given collection, we can fire off our Error or our
- * nulls of whatever.
- */
 
 export class ChunkedSnapshotListener {
   collectionRef: CollectionReference

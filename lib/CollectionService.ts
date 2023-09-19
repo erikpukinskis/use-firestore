@@ -74,7 +74,6 @@ export class CollectionService {
     onDocs: (docs: CachedDocument[]) => void,
     onError: (error: Error) => void
   ) {
-    debugger
     this.collectionReferencesByPath[collection.path] = collection
 
     const existingListener =
@@ -225,7 +224,6 @@ export class CollectionService {
     collectionPath: string,
     querySnapshot: QuerySnapshot
   ) {
-    debugger
     const dirtyIds: string[] = []
 
     const docsCache =
@@ -287,7 +285,6 @@ export class CollectionService {
           "... throwing!"
         )
 
-        debugger
         subscription.onError(
           new Error(
             `No document in collection ${collectionPath} with id(s) ${missingIds.join(
@@ -356,12 +353,6 @@ export class CollectionService {
           return doc
         })
 
-        // if (docs.some((doc) => !doc)) {
-        //   throw new Error(
-        //     `Got an undefined doc in handleSnapshot?`
-        //   )
-        // }
-
         subscription.onDocs(docs)
       }
     }
@@ -372,7 +363,6 @@ export class CollectionService {
     hookId: string,
     ids: string[]
   ) {
-    debugger
     this.docIdsByHookId[hookId] = ids
 
     const collectionSubscriptions =
@@ -381,10 +371,7 @@ export class CollectionService {
     const docCache =
       this.docsCacheByCollectionPath[collectionPath]
 
-    /// maybe here we don't want to look at the docCache, we want to look at listener.subscribedIds?
-
-    const listener =
-      this.snapshotListenersByCollectionPath[collectionPath]
+    this.snapshotListenersByCollectionPath[collectionPath]
 
     const addedIds =
       this.snapshotListenersByCollectionPath[
@@ -446,13 +433,8 @@ export class CollectionService {
           )}`
         )
       )
-      // return
+      return
     }
-
-    // if (docs.some((doc) => !doc)) {
-    //   debugger
-    //   throw new Error(`Got an undefined doc in updateDocIds?`)
-    // }
 
     subscription.onDocs(docs)
   }

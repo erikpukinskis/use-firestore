@@ -1,9 +1,4 @@
-import {
-  cleanup,
-  fireEvent,
-  render,
-  waitFor,
-} from "@testing-library/react"
+import { cleanup, render, waitFor } from "@testing-library/react"
 import {
   renderHook,
   suppressErrorOutput,
@@ -17,7 +12,6 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore"
-import React, { useEffect, useState } from "react"
 import {
   describe,
   it,
@@ -257,7 +251,7 @@ describe("useDocs", () => {
         ),
       {
         wrapper: ({ children }) => (
-          <DocsProvider debug>{children}</DocsProvider>
+          <DocsProvider>{children}</DocsProvider>
         ),
         initialProps: { ids },
       }
@@ -274,7 +268,6 @@ describe("useDocs", () => {
     const restoreConsole = suppressErrorOutput()
 
     try {
-      console.log("here will ids update?")
       rerender({ ids: [...ids, "id-not-to-be-found"] })
 
       await waitFor(() => {
