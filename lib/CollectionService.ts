@@ -430,6 +430,7 @@ export class CollectionService {
       return doc
     })
 
+    console.log("yes we're updating ids")
     if (missingIds.length > 0) {
       this.log(
         "No document in collection",

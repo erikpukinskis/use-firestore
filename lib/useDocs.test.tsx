@@ -1,4 +1,9 @@
-import { cleanup, render, waitFor } from "@testing-library/react"
+import {
+  cleanup,
+  fireEvent,
+  render,
+  waitFor,
+} from "@testing-library/react"
 import {
   renderHook,
   suppressErrorOutput,
@@ -12,6 +17,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore"
+import React, { useEffect, useState } from "react"
 import {
   describe,
   it,
@@ -251,7 +257,7 @@ describe("useDocs", () => {
         ),
       {
         wrapper: ({ children }) => (
-          <DocsProvider>{children}</DocsProvider>
+          <DocsProvider debug>{children}</DocsProvider>
         ),
         initialProps: { ids },
       }
@@ -268,6 +274,7 @@ describe("useDocs", () => {
     const restoreConsole = suppressErrorOutput()
 
     try {
+      console.log("here will ids update?")
       rerender({ ids: [...ids, "id-not-to-be-found"] })
 
       await waitFor(() => {
@@ -277,4 +284,96 @@ describe("useDocs", () => {
       restoreConsole()
     }
   })
+
+  it.only("throws an error if you try to render a new hook with the same missing ids that were already reported missing", async () => {
+    function OneMiss() {
+      const [ids, setIds] = useState<string[]>([])
+      const tags = useDocs(
+        collection(getFirestore(testApp), "tags"),
+        ids
+      )
+
+      useEffect(() => {
+        setTimeout(() => {
+          setIds(["do-not-find-me"])
+        }, 10)
+      }, [])
+
+      return tags ? (
+        <>{tags.length} tags</>
+      ) : (
+        <>loading first miss...</>
+      )
+    }
+
+    function TwoMisses() {
+      const [didClick, setClicked] = useState(false)
+      return (
+        <>
+          <TestErrorBoundary>
+            <OneMiss />
+          </TestErrorBoundary>
+          {didClick ? (
+            <TestErrorBoundary>
+              <OneMiss />
+            </TestErrorBoundary>
+          ) : (
+            <button onClick={() => setClicked(true)}>
+              Miss again
+            </button>
+          )}
+        </>
+      )
+    }
+
+    const { getByRole, getAllByText } = render(<TwoMisses />, {
+      wrapper: ({ children }) => (
+        <DocsProvider debug>{children}</DocsProvider>
+      ),
+    })
+
+    const restoreConsole = suppressErrorOutput()
+
+    try {
+      await waitFor(() => {
+        expect(
+          getAllByText(
+            /No document in collection tags with id\(s\) do-not-find-me/
+          )
+        ).toHaveLength(1)
+      })
+
+      fireEvent.click(
+        getByRole("button", { name: "Miss again" })
+      )
+
+      await waitFor(() => {
+        expect(
+          getAllByText(
+            /No document in collection tags with id\(s\) do-not-find-me/
+          )
+        ).toHaveLength(2)
+      })
+    } finally {
+      restoreConsole()
+    }
+  })
 })
+
+class TestErrorBoundary extends React.Component {
+  state: { error?: Error } = {}
+
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+
+  render() {
+    const { error } = this.state
+    const { children } = this.props
+
+    if (error) {
+      return <div>Error: {error.message}</div>
+    }
+    return children
+  }
+}

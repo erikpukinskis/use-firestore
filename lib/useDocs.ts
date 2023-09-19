@@ -140,6 +140,7 @@ export function useDocs<T extends { id: string }>(
     return !ids || ids.length < 1 ? [] : undefined
   })
   const hookId = useHookId(collection, ids)
+  console.log("rendering", hookId, "ids are", ids)
   const service = useCollectionService("useDoc")
   const firstRenderRef = useRef(true)
   const mountedRef = useRef(true)
@@ -190,6 +191,12 @@ export function useDocs<T extends { id: string }>(
 
   useEffect(
     function updateDocIds() {
+      console.log(
+        "updating doc ids",
+        firstRenderRef.current
+          ? "on first render"
+          : "on subsequent render"
+      )
       if (firstRenderRef.current) {
         firstRenderRef.current = false
         return
