@@ -445,7 +445,7 @@ export class CollectionService {
           )}`
         )
       )
-      return
+      // return
     }
 
     // if (docs.some((doc) => !doc)) {
