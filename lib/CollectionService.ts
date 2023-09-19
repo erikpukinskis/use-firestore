@@ -330,18 +330,18 @@ export class CollectionService {
           "is still waiting on ids",
           missingIds
         )
-        // subscription.onDocs(undefined)
-      } else {
-        this.log(
-          "Notifying",
-          subscription.hookId,
-          "of new docs, it wants",
-          this.docIdsByHookId[subscription.hookId]
-        )
+        continue
+      }
 
-        const docs = this.docIdsByHookId[
-          subscription.hookId
-        ].map((id) => {
+      this.log(
+        "Notifying",
+        subscription.hookId,
+        "of new docs, it wants",
+        this.docIdsByHookId[subscription.hookId]
+      )
+
+      const docs = this.docIdsByHookId[subscription.hookId].map(
+        (id) => {
           const doc = docsCache[id]
 
           if (!doc) {
@@ -351,10 +351,10 @@ export class CollectionService {
           }
 
           return doc
-        })
+        }
+      )
 
-        subscription.onDocs(docs)
-      }
+      subscription.onDocs(docs)
     }
   }
 
@@ -417,7 +417,6 @@ export class CollectionService {
       return doc
     })
 
-    console.log("yes we're updating ids")
     if (missingIds.length > 0) {
       this.log(
         "No document in collection",
