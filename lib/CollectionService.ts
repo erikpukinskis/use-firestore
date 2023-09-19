@@ -74,6 +74,7 @@ export class CollectionService {
     onDocs: (docs: CachedDocument[]) => void,
     onError: (error: Error) => void
   ) {
+    debugger
     this.collectionReferencesByPath[collection.path] = collection
 
     const existingListener =
@@ -110,6 +111,8 @@ export class CollectionService {
     this.log(
       "Registering",
       hookId,
+      "ids",
+      ids,
       existingListener
         ? `⇒ has owner (${collectionSubscriptions.length} listeners)`
         : "⇒ subscribing..."
@@ -222,6 +225,7 @@ export class CollectionService {
     collectionPath: string,
     querySnapshot: QuerySnapshot
   ) {
+    debugger
     const dirtyIds: string[] = []
 
     const docsCache =
@@ -274,6 +278,27 @@ export class CollectionService {
         subscription.hookId
       ].filter((id) => !docsCache[id])
 
+      if (missingIds.length > 0 && listener.isLoaded) {
+        this.log(
+          "No document in collection",
+          collectionPath,
+          "with id(s)",
+          missingIds,
+          "... throwing!"
+        )
+
+        debugger
+        subscription.onError(
+          new Error(
+            `No document in collection ${collectionPath} with id(s) ${missingIds.join(
+              ","
+            )}`
+          )
+        )
+
+        return
+      }
+
       if (dirtyIdsForHook.length === 0) {
         this.log(
           "Hook",
@@ -285,25 +310,6 @@ export class CollectionService {
             : "...listener still waiting on chunks"
         )
 
-        if (missingIds.length > 0 && listener.isLoaded) {
-          this.log(
-            "No document in collection",
-            collectionPath,
-            "with id(s)",
-            missingIds
-          )
-
-          subscription.onError(
-            new Error(
-              `No document in collection ${collectionPath} with id(s) ${missingIds.join(
-                ","
-              )}`
-            )
-          )
-
-          return
-        }
-
         continue
       }
 
@@ -314,7 +320,10 @@ export class CollectionService {
         this.docIdsByHookId[subscription.hookId],
         "...",
         missingIds,
-        "are missing"
+        "are missing",
+        listener.isLoaded
+          ? "...listener is fully loaded"
+          : "...listener still waiting on chunks"
       )
 
       if (missingIds.length > 0) {
@@ -332,9 +341,26 @@ export class CollectionService {
           "of new docs, it wants",
           this.docIdsByHookId[subscription.hookId]
         )
+
         const docs = this.docIdsByHookId[
           subscription.hookId
-        ].map((id) => docsCache[id])
+        ].map((id) => {
+          const doc = docsCache[id]
+
+          if (!doc) {
+            throw new Error(
+              `Supposedly there are no missing ids, but we're trying to pull ${collectionPath}/${id} from the cache and not finding it?`
+            )
+          }
+
+          return doc
+        })
+
+        // if (docs.some((doc) => !doc)) {
+        //   throw new Error(
+        //     `Got an undefined doc in handleSnapshot?`
+        //   )
+        // }
 
         subscription.onDocs(docs)
       }
@@ -346,6 +372,7 @@ export class CollectionService {
     hookId: string,
     ids: string[]
   ) {
+    debugger
     this.docIdsByHookId[hookId] = ids
 
     const collectionSubscriptions =
@@ -354,23 +381,30 @@ export class CollectionService {
     const docCache =
       this.docsCacheByCollectionPath[collectionPath]
 
-    const someDocsUncached = ids.some((id) => !docCache[id])
+    /// maybe here we don't want to look at the docCache, we want to look at listener.subscribedIds?
+
+    const listener =
+      this.snapshotListenersByCollectionPath[collectionPath]
+
+    const addedIds =
+      this.snapshotListenersByCollectionPath[
+        collectionPath
+      ].addIds(ids)
 
     this.log(
       "Updated ids for",
       hookId,
       "to",
       ids,
-      someDocsUncached
+      addedIds.length > 0
         ? "need to resubscribe"
         : "all docs cached"
     )
 
-    this.snapshotListenersByCollectionPath[
-      collectionPath
-    ].addIds(ids)
-
-    if (someDocsUncached) {
+    // If there are new ids then we'll have to resubscribe and we know that
+    // there are some docs missing from the cache. Therefore no need to attempt
+    // to update the hook with new docs.
+    if (addedIds.length > 0) {
       return
     }
 
@@ -384,7 +418,40 @@ export class CollectionService {
       )
     }
 
-    const docs = ids.map((id) => docCache[id])
+    const missingIds: string[] = []
+
+    const docs = ids.map((id) => {
+      const doc = docCache[id]
+
+      if (!doc) {
+        missingIds.push(id)
+      }
+
+      return doc
+    })
+
+    if (missingIds.length > 0) {
+      this.log(
+        "No document in collection",
+        collectionPath,
+        "with id(s)",
+        missingIds,
+        "... throwing!"
+      )
+      subscription.onError(
+        new Error(
+          `No document in collection ${collectionPath} with id(s) ${missingIds.join(
+            ","
+          )}`
+        )
+      )
+      return
+    }
+
+    // if (docs.some((doc) => !doc)) {
+    //   debugger
+    //   throw new Error(`Got an undefined doc in updateDocIds?`)
+    // }
 
     subscription.onDocs(docs)
   }

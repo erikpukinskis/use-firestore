@@ -6,7 +6,6 @@ import {
   where,
   documentId,
 } from "firebase/firestore"
-import { difference } from "./helpers"
 import chunk from "./helpers/chunk"
 import { serializeQuery } from "./serializeQuery"
 
@@ -31,8 +30,7 @@ function red(text: string) {
 
 export class ChunkedSnapshotListener {
   collectionRef: CollectionReference
-  subscribedIds: string[] = []
-  currentIds: string[]
+  ids = new Set<string>()
   chunks: string[][] = []
   chunkIsLoaded: boolean[] = []
   unsubscribes: (() => void)[] = []
@@ -48,7 +46,7 @@ export class ChunkedSnapshotListener {
     onSnapshot: (snapshot: QuerySnapshot) => void
   ) {
     this.collectionRef = collectionRef
-    this.currentIds = [...initialIds]
+    initialIds.forEach((id) => this.ids.add(id))
     this.onSnapshot = onSnapshot
     this.debug = debug
 
@@ -56,7 +54,7 @@ export class ChunkedSnapshotListener {
       "Created waiting chunked listener for",
       this.collectionRef.path,
       "with",
-      this.currentIds.length,
+      initialIds.length,
       "ids initially"
     )
   }
@@ -71,12 +69,11 @@ export class ChunkedSnapshotListener {
       "Starting",
       this.collectionRef.path,
       "listener, listening to",
-      this.currentIds.length,
+      this.ids.size,
       "ids"
     )
     this.status = "started"
-    this.subscribeNewChunks(this.currentIds)
-    this.subscribedIds.push(...this.currentIds)
+    this.subscribeNewChunks([...this.ids])
   }
 
   private subscribeNewChunks(ids: string[]) {
@@ -113,18 +110,26 @@ export class ChunkedSnapshotListener {
     }
   }
 
-  addIds(newIds: string[]) {
+  /**
+   * @param newIds ids to listen for. Can be a mixture of ids already being listened to and new ids
+   * @returns the subset ids that weren't already subscribed
+   */
+  addIds(newIds: string[]): string[] {
     if (this.status === "stopped") {
       throw new Error(
         `Tried to use snapshot listener for ${this.collectionRef.path} but it was shut down`
       )
     }
 
-    const idsToSubscribe = difference(newIds, this.subscribedIds)
+    const idsToSubscribe = newIds.filter(
+      (newId) => !this.ids.has(newId)
+    )
+
+    idsToSubscribe.forEach((idToSubscribe) => {
+      this.ids.add(idToSubscribe)
+    })
 
     if (this.status === "waiting") {
-      this.currentIds.push(...idsToSubscribe)
-
       this.log(
         "Ids",
         newIds,
@@ -135,7 +140,7 @@ export class ChunkedSnapshotListener {
         "are new"
       )
 
-      return
+      return idsToSubscribe
     }
 
     if (idsToSubscribe.length < 1) {
@@ -146,7 +151,7 @@ export class ChunkedSnapshotListener {
         newIds
       )
 
-      return
+      return idsToSubscribe
     }
 
     this.log(
@@ -187,7 +192,7 @@ export class ChunkedSnapshotListener {
       this.subscribeNewChunks(idsForFutureChunks)
     }
 
-    this.subscribedIds.push(...idsToSubscribe)
+    return idsToSubscribe
   }
 
   private resubscribe(chunkIndex: number, chunk: string[]) {

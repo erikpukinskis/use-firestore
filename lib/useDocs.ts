@@ -144,10 +144,13 @@ export function useDocs<T extends { id: string }>(
   const firstRenderRef = useRef(true)
   const mountedRef = useRef(true)
   const [error, setError] = useState<Error | undefined>()
+  const log = useLog()
 
   if (error) {
     throw error
   }
+
+  log("rendering", hookId, "ids are", ids, "docs are", docs)
 
   useEffect(
     () => () => {
@@ -174,6 +177,9 @@ export function useDocs<T extends { id: string }>(
         )
 
       if (cachedDocs) {
+        if (cachedDocs.some((doc) => !doc)) {
+          throw new Error(`Got an undefined cached doc?`)
+        }
         setDocs(cachedDocs as unknown as T[])
       }
 
