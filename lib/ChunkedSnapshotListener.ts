@@ -70,16 +70,10 @@ export class ChunkedSnapshotListener {
         where(documentId(), "in", chunk)
       )
       const chunkIndex = this.chunks.length
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        this.chunkIsLoaded[chunkIndex] = true
-        if (
-          !this.isLoaded &&
-          this.chunkIsLoaded.every((isLoaded) => isLoaded)
-        ) {
-          this.isLoaded = true
-        }
-        this.onSnapshot(snapshot)
-      })
+      const unsubscribe = onSnapshot(
+        q,
+        this.handleSnapshot(chunkIndex)
+      )
 
       this.log(
         "Subscribing to",
@@ -180,6 +174,19 @@ export class ChunkedSnapshotListener {
     return idsToSubscribe
   }
 
+  private handleSnapshot(chunkIndex: number) {
+    return (snapshot: QuerySnapshot) => {
+      this.chunkIsLoaded[chunkIndex] = true
+      if (
+        !this.isLoaded &&
+        this.chunkIsLoaded.every((isLoaded) => isLoaded)
+      ) {
+        this.isLoaded = true
+      }
+      this.onSnapshot(snapshot)
+    }
+  }
+
   private resubscribe(chunkIndex: number, chunk: string[]) {
     const oldUnsubscribe = this.unsubscribes[chunkIndex]
 
@@ -190,7 +197,13 @@ export class ChunkedSnapshotListener {
       where(documentId(), "in", chunk)
     )
 
-    const newUnsubscribe = onSnapshot(q, this.onSnapshot)
+    this.chunkIsLoaded[chunkIndex] = false
+    this.isLoaded = false
+
+    const newUnsubscribe = onSnapshot(
+      q,
+      this.handleSnapshot(chunkIndex)
+    )
 
     this.log(
       "Resubscribing",

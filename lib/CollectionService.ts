@@ -373,10 +373,10 @@ export class CollectionService {
 
     this.snapshotListenersByCollectionPath[collectionPath]
 
-    const addedIds =
-      this.snapshotListenersByCollectionPath[
-        collectionPath
-      ].addIds(ids)
+    const listener =
+      this.snapshotListenersByCollectionPath[collectionPath]
+
+    const addedIds = listener.addIds(ids)
 
     this.log(
       "Updated ids for",
@@ -416,6 +416,10 @@ export class CollectionService {
 
       return doc
     })
+
+    if (missingIds.length > 0 && !listener.isLoaded) {
+      return
+    }
 
     if (missingIds.length > 0) {
       this.log(
