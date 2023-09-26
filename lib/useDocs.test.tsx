@@ -1,5 +1,8 @@
 import { cleanup, render, waitFor } from "@testing-library/react"
-import { renderHook } from "@testing-library/react-hooks"
+import {
+  renderHook,
+  suppressErrorOutput,
+} from "@testing-library/react-hooks"
 import {
   collection,
   doc,
@@ -231,5 +234,47 @@ describe("useDocs", () => {
     await waitFor(() => getByText("two"))
 
     expect(onSnapshot).toHaveBeenCalledTimes(3)
+  })
+
+  it("throws an error when docs are not found", async () => {
+    const { tag } = await setUpTag(testApp, {
+      text: `this tag will be found`,
+    })
+
+    const ids = [tag.id]
+
+    const { result, rerender } = renderHook(
+      ({ ids }) =>
+        useDocs<Tag>(
+          collection(getFirestore(testApp), "tags"),
+          ids
+        ),
+      {
+        wrapper: ({ children }) => (
+          <DocsProvider>{children}</DocsProvider>
+        ),
+        initialProps: { ids },
+      }
+    )
+
+    await waitFor(() => {
+      expect(result.current).toBeInstanceOf(Array)
+      expect(result.current).toHaveLength(1)
+      expect(result.current?.[0]).toMatchObject({
+        text: "this tag will be found",
+      })
+    })
+
+    const restoreConsole = suppressErrorOutput()
+
+    try {
+      rerender({ ids: [...ids, "id-not-to-be-found"] })
+
+      await waitFor(() => {
+        expect(result.error).toBeDefined()
+      })
+    } finally {
+      restoreConsole()
+    }
   })
 })
